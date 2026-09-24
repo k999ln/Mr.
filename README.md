@@ -13,6 +13,10 @@ Mr.は、自社開発・外部の自動化ツールをまとめ、Web・アプ�
 
 avocadominiは、仕事の整理、教材作成、内容確認、販売準備、集客、顧客案内、入金確認、納品、分析、報酬分配を、Telegramから動かす仕事の司令室です。
 
+## Telegramの入口
+
+まず[Mr.メインチャンネル／入口](https://t.me/RockstarMrBot)から入れます。そこから用途に応じて、[avocadomini](https://t.me/avocadominibot)（公開向けの道具ハブ）または[ibot](https://t.me/Rockstar_ibot)（運営・開発用）へ進みます。Botを開いたら`/start`、メニュー確認は`/help`を送ってください。
+
 システム全体の正式名は`Rockstar_ibot`です。`Mr. Commerce`と`Doraemon`は互換性のため残る内部package名で、利用者向けの製品名は「avocadomini」です。
 
 > 現在の本番範囲は、10種類から1〜3種類を選び、Telegramへ自然文で依頼し、隔離されたCodexから下書き・確認結果を受け取り、修正・完了・再開するところまでです。外部providerの認証情報や公式readbackがない操作は成功扱いにしません。

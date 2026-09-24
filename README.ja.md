@@ -6,6 +6,10 @@
 
 avocadominiは、10種類から1〜3種類を選び、Telegramへ普通の文章で仕事を頼み、下書き・確認結果を受け取って修正・完了・再開できる仕事の司令室です。外部送信、公開、決済、返金、権限付与、送金は、接続・本人確認・公式receiptが揃った場合だけ行います。
 
+## Telegramの入口
+
+まず[Mr.メインチャンネル／入口](https://t.me/RockstarMrBot)から入れます。用途に応じて、[avocadomini](https://t.me/avocadominibot)（公開向けの道具ハブ）または[ibot](https://t.me/Rockstar_ibot)（運営・開発用）へ進みます。Botを開いたら`/start`、メニュー確認は`/help`を送ってください。
+
 Telegramで迷ったときは、`/home`、`/tools`、`/jobs`、`/today`、`/help`からいつでも最新状態へ戻れます。
 
 - [Rockstar_ibot One Hub](https://life-manager-one-hub.kirin-999.chatgpt.site)
