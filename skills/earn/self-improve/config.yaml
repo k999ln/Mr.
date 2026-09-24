@@ -1,0 +1,142 @@
+# config.yaml — openevolve run configuration for the self-improve harness (REQ-OE4/OE5).
+#
+# Field names follow the real algorithmicsuperintelligence/openevolve `openevolve/config.py`
+# (re-verified 2026-07-07 against the actually pip-installed `openevolve==0.3.0` in the proving
+# venv — see execution-notes-self-improve.md "Stage-2 real run"): `EvaluatorConfig.cascade_thresholds`
+# (default [0.5, 0.75, 0.9]) and `DatabaseConfig.num_islands` (default 5).
+
+max_iterations: 40  # raised from 20 (close-loop revision, 2026-07-08): the prior 10-iteration
+                    # real run's tracked "best" never moved off the unmodified seed program — more
+                    # attempts is the cheap, non-gaming lever (this run stays $0, free-tier only).
+checkpoint_interval: 10  # top-level Config field (NOT database.checkpoint_interval). Raised from
+                         # 5 -> 10 for 40 iterations to cut checkpoint-write disk churn on this
+                         # box's tight local disk (df showed <900Mi free before this run — see
+                         # execution-notes-self-improve.md's close-loop-2 section).
+
+llm:
+  # Endpoint = the colony's own local ClawRouter proxy (127.0.0.1:8402), backed by the
+  # SELF-FUNDED anicca-a3cdd4 automaton's own wallet (0xa3CDd4Ec... on Base) — NOT a human's
+  # personal API key/subscription (REQ-OE4 / no-human-loop invariant). Wallet balance is $0.00
+  # (verified via `clawrouter wallet` 2026-07-08 again), so only a FREE-tier model can be used —
+  # this is a structural guarantee against any spend, not just a policy.
+  #
+  # MODEL CHOICE (re-verified LIVE 2026-07-08, capable-improver revision): qwen3.5-122b-a10b and
+  # mistral-large-3-675b were both retired from this config after the prior close-loop-2 run (40
+  # real iterations, both models in the ensemble) still never produced a candidate that beat
+  # baseline under the risk-adjusted metric — every accepted-format sample either failed to parse
+  # ("No valid diffs found") or landed on a tie/regression, per execution-notes-self-improve.md's
+  # close-loop section. Switched to `free/gpt-oss-120b` (OpenAI's open-weight 120B, served free via
+  # the local ClawRouter proxy, same $0/no-human-credential endpoint) and re-verified LIVE with a
+  # standalone probe (`/private/tmp/.../scratchpad/probe_gptoss.py`, the exact rendered
+  # system_message below + the real `diff_user.txt` shape openevolve sends, fired at the real
+  # current `pm_backtest_strategy.py`): 2/2 live samples (temperature 0.5, 0.9) each returned
+  # finish_reason=stop and a byte-correct `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE` block
+  # whose SEARCH text exactly matched the current `score_candidate` function body (including the
+  # EVOLVE-BLOCK-START/END marker lines at the same relative position) — parses cleanly with
+  # openevolve's own `extract_diffs` regex and would PASS `scope_guard` (SEARCH/REPLACE both
+  # confined strictly inside the block). The proposed edits were substantive selection-logic
+  # changes (added price/liquidity/resolve-horizon quality filters on top of the existing
+  # min_edge/min_confidence gate, i.e. exactly the "tighten trade SELECTION" lever this file's
+  # system_message steers toward), not a stake-multiplier-only change. Two ensemble entries at
+  # different temperatures for the same request-diversity/cache-defeat reason documented in this
+  # file's prior revisions (see execution-notes-self-improve.md for the caching-trap background).
+  api_base: "http://127.0.0.1:8402/v1"
+  api_key: "unused-local-proxy-no-auth"  # the local ClawRouter proxy does not check this value
+  # openevolve's OpenAI client ALWAYS includes `top_p` in the request body (even when None), and
+  # the local ClawRouter proxy's schema validator 400s on `"top_p": null` ("expected number,
+  # received null") — confirmed live 2026-07-07 in the first trial run (every LLM call failed
+  # before this fix). Must be a real number.
+  top_p: 1.0
+  # max_tokens raised from openevolve's own default (4096) to 8192 (close-loop-2, 2026-07-08):
+  # live test responses (explanatory prose + diff) ran 11.8k-16.1k chars — comfortably under 8192
+  # tokens but close enough to the 4096-token default that a verbose sample could plausibly be cut
+  # off mid-diff on some future longer response. This is pure headroom, not a fitness/gate change.
+  max_tokens: 8192
+  # The free-tier bucket for each model is a SHORT rolling-window rate limit, not a hard daily cap
+  # — confirmed live both 2026-07-07 (mistral) and 2026-07-08 (qwen, 429'd after 2 calls within a
+  # couple minutes). Raised retries/retry_delay again (5/20s -> 8/25s) to let a single generation
+  # call ride out a short window instead of failing the whole iteration outright.
+  retries: 8
+  retry_delay: 25
+  # Same free/gpt-oss-120b model at THREE different temperatures via openevolve's own LLMEnsemble
+  # (llm/ensemble.py::_sample_model — a weighted random.choice over `llm.models` on every
+  # generate_with_context call; not a custom addition). Multiple temperature entries (not multiple
+  # models) both escapes the local proxy's response cache (fixed single-temperature requests are
+  # byte-identical at generation 0 and get served from cache instead of a fresh sample — see
+  # execution-notes-self-improve.md's caching-trap section) and gives more sampling diversity per
+  # attempt from the one model already demonstrated (above) to produce valid, in-scope diffs.
+  models:
+    - name: "free/gpt-oss-120b"
+      temperature: 0.4
+      weight: 1.0
+    - name: "free/gpt-oss-120b"
+      temperature: 0.8
+      weight: 1.0
+    - name: "free/gpt-oss-120b"
+      temperature: 1.1
+      weight: 1.0
+
+prompt:
+  # Real openevolve (verified against the installed 0.3.0 package: prompts/defaults/diff_user.txt
+  # + prompt/sampler.py) NEVER mentions "EVOLVE-BLOCK" anywhere in its own default templates — the
+  # markers are shown to the model only as plain text inside the full current-program dump, with
+  # no instruction to respect them. This is exactly why scope_guard.py exists as the sole
+  # enforcement (see its own module docstring). Left at openevolve's un-augmented default, a real
+  # run (2026-07-07, two separate free models, 25 iterations each) produced real LLM-generated
+  # SEARCH/REPLACE edits that ALWAYS also touched load_fixture/_stake_for_row outside the block —
+  # 100% scope_guard rejection rate. Per the colony's own agent-building rule ("put guidance in the
+  # PROMPT, natural language to the model — never a hardcoded gate that overrides the model"), the
+  # fix is to STEER the model via its own system message, not to touch scope_guard (which stays the
+  # enforcement layer regardless of what the model does).
+  system_message: |
+    You are an expert software developer tasked with iteratively improving a codebase.
+    Your goal is to maximize the FITNESS SCORE while exploring diverse solutions across feature dimensions.
+    The system maintains a collection of diverse programs - both high fitness AND diversity are valuable.
+
+    HARD CONSTRAINT: the program you are editing has exactly one region you may change, marked by
+    the literal comment lines `# EVOLVE-BLOCK-START` and `# EVOLVE-BLOCK-END`. Every SEARCH block in
+    your SEARCH/REPLACE diff MUST be text that appears STRICTLY BETWEEN those two marker lines
+    (never the marker lines themselves, never any line before EVOLVE-BLOCK-START, never any line
+    after EVOLVE-BLOCK-END). Do not "clean up", refactor, or touch the fixture loader, the backtest
+    harness, or any other function outside the marked block, even if it looks improvable — any edit
+    outside the block is automatically and unconditionally rejected before it is ever scored, so
+    such an edit wastes the whole attempt. Confine 100% of your proposed changes to the body of the
+    single function between the markers.
+
+    Your SEARCH/REPLACE diff MUST end its final line with the exact literal text `>>>>>>> REPLACE`
+    (all seven `>` characters immediately followed by a single space and the word REPLACE) — a
+    closing fence of `>>>>>>>` alone, without the trailing ` REPLACE`, or any other variation, is not
+    recognized as a diff at all and your entire response is silently discarded before it is ever
+    scored, wasting the whole attempt. Double-check this exact closing line before finishing.
+
+    The highest-leverage lever inside the evolvable function is the trade-SELECTION logic: the
+    thresholds (`min_edge`, `min_confidence`) and any equivalent condition that decides WHICH
+    candidates get a nonzero stake at all. The fitness score is a Sharpe-like ratio (mean divided by
+    standard deviation) over several out-of-sample windows, so uniformly scaling the stake SIZE
+    (e.g. changing `base_stake` alone) on an otherwise-UNCHANGED set of selected trades cannot move
+    that ratio — it scales the numerator and denominator identically and is not a productive place
+    to spend your edits. Tightening the selection condition so only higher-conviction opportunities
+    are taken (dropping marginal/noisy edge cases that hurt the worst-case window) tends to raise
+    this kind of risk-adjusted score far more reliably than resizing stakes. Prefer exploring
+    selection thresholds, new combining features over the given inputs, or genuinely different
+    selection logic over stake-size-only changes.
+
+database:
+  # Persist the program database + per-program prompt/response logs to disk (real openevolve
+  # `DatabaseConfig.db_path`/`log_prompts` fields — not a custom addition) so every real candidate
+  # this run generates (not just the tracked "best") is inspectable as evidence afterward, and so
+  # a rate-limit-interrupted run can be resumed with `--checkpoint`.
+  db_path: "runs/db"
+  population_size: 20
+  num_islands: 3  # >= 2, REQ-OE5 — MAP-Elites diversity/anti-premature-convergence (openevolve's
+                  # own README/configs rationale), NOT a non-stationarity fix (that is REQ-EV3/
+                  # RH5's rotated walk-forward windows, per Sutton & Barto's own §2.4 caveat)
+
+evaluator:
+  timeout: 60
+  # Local convention (this feature): a single-element cascade — the stage1 quick-window net USD
+  # (see evaluator.py::STAGE1_MIN_NET_USD) must clear this bar before stage2's walk-forward run is
+  # attempted. openevolve's own generic cascade_thresholds are fractions of a normalized reward;
+  # our combined_score is USD-scaled, so this list is a local simplification, not upstream's
+  # literal default — documented here rather than silently reusing [0.5, 0.75, 0.9].
+  cascade_thresholds: [1.0]

@@ -1,0 +1,23 @@
+{
+  "$schema": "./registry.schema.json",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "serverName": "io.rockstar-ibot.examples/remote-ai-tool",
+      "directory": "templates/remote-mcp",
+      "entryKind": "template",
+      "state": "catalog_only",
+      "manifestSha256": "e429eda5ee491fc3ec50a7005e1a483e860c440f1f75af6bb1ab54a2ae44f74b",
+      "publisher": {
+        "id": "rockstar-ibot-examples",
+        "displayName": "Rockstar_ibot Examples",
+        "status": "unverified"
+      },
+      "review": {
+        "security": "unreviewed",
+        "signature": "not_required_template"
+      },
+      "enabledCapabilities": []
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "featureName": "hl-realized-pnl",
+  "mode": "strict",
+  "language": "python",
+  "currentPhase": "complete",
+  "phaseHistory": [
+    {
+      "from": "init",
+      "to": "1a",
+      "timestamp": "2026-07-08T19:48:32.106Z",
+      "reason": "behavioral spec written"
+    },
+    {
+      "from": "1a",
+      "to": "1b",
+      "timestamp": "2026-07-08T19:48:32.111Z",
+      "reason": "verification architecture written"
+    },
+    {
+      "from": "1b",
+      "to": "1c",
+      "timestamp": "2026-07-08T20:12:52.293Z",
+      "reason": "spec review executed"
+    },
+    {
+      "from": "1c",
+      "to": "2a",
+      "timestamp": "2026-07-08T20:12:52.305Z",
+      "reason": "spec review PASS iter2, 0 blocking",
+      "sprint": 1
+    },
+    {
+      "from": "2a",
+      "to": "2b",
+      "timestamp": "2026-07-08T20:48:06.663Z",
+      "reason": "GREEN: 39+1skip pytest, 12 node, regression 44/13/9 green",
+      "sprint": 1
+    },
+    {
+      "from": "2b",
+      "to": "2c",
+      "timestamp": "2026-07-08T20:48:18.588Z",
+      "reason": "refactor pass: PROP-023 retrofit included, no further changes",
+      "sprint": 1
+    },
+    {
+      "from": "2c",
+      "to": "3",
+      "timestamp": "2026-07-08T20:53:12.584Z",
+      "reason": "GREEN+refactor done, PROP-021 live E2E all PASS",
+      "sprint": 1
+    },
+    {
+      "from": "3",
+      "to": "5",
+      "timestamp": "2026-07-08T21:14:56.804Z",
+      "reason": "impl review PASS iter2, 0 blocking, SAFE_TO_DEPLOY",
+      "sprint": 1
+    },
+    {
+      "from": "5",
+      "to": "6",
+      "timestamp": "2026-07-08T21:32:10.207Z",
+      "reason": "sprint verdict PASS 6/6 criteria, hardening artifacts complete",
+      "sprint": 1
+    },
+    {
+      "from": "6",
+      "to": "complete",
+      "timestamp": "2026-07-08T21:32:31.718Z",
+      "reason": "converged: 30/30 proved, sprint PASS 6/6, live E2E verified",
+      "sprint": 1
+    }
+  ],
+  "iterations": {
+    "3": 1,
+    "5": 1,
+    "6": 1,
+    "1a": 1,
+    "1b": 1,
+    "1c": 1,
+    "2a": 1,
+    "2b": 1,
+    "2c": 1,
+    "complete": 1
+  },
+  "proofObligations": [],
+  "traceability": {
+    "epicId": "VCSDD-hl-realized-pnl-1783539164394",
+    "beads": []
+  },
+  "gates": {
+    "3": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-08T21:14:56.802Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "iteration": 2,
+        "blockingFindings": 0,
+        "majorFindings": 0,
+        "minorFindings": 2,
+        "deploymentRecommendation": "SAFE_TO_DEPLOY"
+      }
+    },
+    "1c": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-08T20:12:43.374Z",
+      "reviewedBy": "human",
+      "details": {
+        "approvedBasedOn": "adversary",
+        "approvalMode": "no-human-loop directive (Dais goal 2026-07-09)"
+      },
+      "adversaryVerdict": "PASS",
+      "adversaryReviewedAt": "2026-07-08T20:12:43.372Z",
+      "humanVerdict": "PASS",
+      "humanApproved": true,
+      "humanApprovedAt": "2026-07-08T20:12:43.374Z"
+    }
+  },
+  "sprintCount": 1,
+  "createdAt": "2026-07-08T19:32:44.393Z",
+  "updatedAt": "2026-07-08T21:32:31.719Z"
+}

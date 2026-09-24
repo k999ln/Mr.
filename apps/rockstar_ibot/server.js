@@ -1,0 +1,1760 @@
+// apps/life-call/server.js — Rockstar_ibot CLOUD wake-call service (Railway, always-on).
+//
+// Two things in one process:
+//   1. A PERSISTENT Gemini-Charon bridge at  wss://<svc>.up.railway.app/ws  — multi-call, with
+//      per-call context read from the WS upgrade URL query (?summary=&dateTime=&location=&urgency=).
+//      Telnyx streams the call's RTP here; we bridge it bidirectionally to Gemini Live (voice Charon).
+//   2. The 60-second SCHEDULER (scheduler.js) that finds users due for a T-15min wake and dials them
+//      with stream_url pointing back at THIS service's /ws.
+//
+// Unlike the local runner-telnyx.mjs (ephemeral cloudflared tunnel + one bridge per call), this is a
+// stable always-on server: Railway gives a permanent public wss, so no cloudflared, no Mac-mini.
+"use strict";
+
+require("./lib/owner-runtime-boundary.js").assertKaiCoreBoundary();
+
+const http = require("http");
+const crypto = require("crypto");
+const { URL } = require("url");
+const WebSocket = require("ws");
+const {
+  routeTelnyxMessage,
+  routeGeminiMessage,
+  geminiSetupForEvent,
+  buildTelnyxMediaFrame,
+  carrierActionForGeminiKind,
+  makeGeminiEndHandler,
+} = require("./lib/call-bridge.cjs");
+const {
+  geminiLiveWsUrl,
+  buildGeminiTurn,
+  parseGeminiTranscripts,
+} = require("./lib/call-logic.js");
+const { startScheduler, startWakeLoop, startReminderLoop, startTravelLoop, startAskLoop, startOnboardLoop, startDiscoveryLoop, buildStreamUrl, langForPhone } = require("./scheduler.js");
+const { openingTurnForLang, resolveCallLang } = require("./lib/call-language.js");
+const { maybeStartLoops } = require("./lib/maybe-start-loops.js");
+const { compBootLog } = require("./lib/comp-window.js");
+const { selfHealWebhook } = require("./lib/webhook-selfheal.js");
+const { publicBaseUrl, telegramPublicConfig } = require("./lib/telegram-config.js");
+const { serve: inngestServe } = require("inngest/node"); // raw Node http server (NOT express) → use the node adapter
+const { inngest } = require("./inngest/client.js");
+const { functions: inngestFunctions } = require("./inngest/functions.js");
+const inngestHandler = inngestServe({ client: inngest, functions: inngestFunctions });
+const { placeCall, startRecording } = require("./lib/dial.js");
+const { amdEnabled, shouldMarkAnswered } = require("./lib/answered.js");
+const { decodeCallClientState, encodeTestCallClientState, verifyTelnyxSignature } = require("./lib/telnyx-webhook.js");
+const { tgCall, parseUpdate, sendMessage, editMessageText, answerCallbackQuery, isPanelCommand, isPanelDeepLink, routeCallbackData, startReply } = require("./lib/telegram.js");
+const { reflectAnswer } = require("./lib/telegram-callback-visibility.js");
+const {
+  createSupabaseLateApprovalStore,
+  handleLateApprovalCallback,
+} = require("./lib/late-approval.js");
+const { sendPanelLink, handlePanelRequest, panelDeviceCodeFromCommand, confirmPanelDeviceCode } = require("./lib/panel-auth.js");
+const { handlePanelApiRequest, handlePanelOAuthCallback, composioCalendarStart, composioCalendarDisconnect } = require("./lib/panel-api.js");
+const { createSupabaseCommandStore } = require("./lib/panel-api.js");
+const { handleCalendarOnboardRequest } = require("./lib/calendar-onboard.js");
+const { parseUserCommand, dispatchParsedControl, executeUserCommand } = require("./lib/user-command.js");
+const { parseSlashCommand, slashAliasText, handleSlashCommand } = require("./lib/slash-command.js");
+const { handleFeedbackMessage, createPostgresFeedbackStore } = require("./lib/feedback-intake.js");
+const { resolveTelegramReply } = require("./lib/telegram-reply.js");
+const { handleInboundReply, handleAskCallback, parseInboundRecipient } = require("./lib/ask.js");
+const { isReplyToken } = require("./lib/reply-token.js");
+const {
+  rowByChatId, handleOnboardingText, handleGmailCallback,
+} = require("./lib/telegram-onboard.js");
+const { createHostedGmailLink } = require("./lib/gmail-onboard.js");
+const { mailAvailable } = require("./lib/mail-availability.js");
+const {
+  markAnswered, applyAmdDetection, applyTestCallDetection, upsertLiveLocation,
+} = require("./lib/late-notice.js");
+const { handleDiscoveryCallback } = require("./lib/feature-discovery.js");
+const { handleCfoTelegramCallback } = require("./lib/cfo-telegram-callback.js");
+const { handleCommerceCallback } = require("./lib/commerce-callback.js");
+const { handleCommerceCommand } = require("./lib/commerce-command.js");
+const { createCommerceEntitlementStore } = require("./lib/commerce-entitlement-store.js");
+const { requireCommerceConnector } = require("./lib/commerce-connector-catalog.js");
+const { toolSelectionMessage, toolSelectionKeyboard } = require("./lib/commerce-telegram-ui.js");
+const { handlePayoutCallback } = require("./lib/payout-question.js");
+const { handleDietCallback } = require("./lib/diet-runtime.js");
+const { handlePreceptsCallback } = require("./lib/precepts-runtime.js");
+const { handleTypedPayoutAddress } = require("./lib/payout-address-intake.js");
+const { handleBrowserTaskMessage } = require("./lib/browser-task-intake.js");
+const { startBrowserJobLoop } = require("./lib/browser-job-runtime.js");
+const { createSupabaseCodexJobStore } = require("./lib/codex-job-store.js");
+const { normalizeSafetyReport, decorateSafetyResult } = require("./lib/doraemon-safety-gate.js");
+const { handleCodexMessage } = require("./lib/codex-telegram.js");
+const { claimEvent, unclaimEvent, applyBilling } = require("./lib/billing.js");
+const {
+  CLAIM_COOKIE,
+  cookieValue: doraemonCookieValue,
+  createPurchaseClaim,
+  applyDoraemonCheckout,
+  purchaseStatus,
+  telegramClaimToken,
+  consumePurchaseClaim,
+} = require("./lib/doraemon-purchase.js");
+const { purchasePage, completePage } = require("./lib/doraemon-storefront.js");
+const {
+  createDoraemonStarsService,
+  createSupabaseStarsEntitlementWriter,
+  createSupabaseStarsRevocationWriter,
+  paysupportReply,
+} = require("./lib/doraemon-stars.js");
+const { createSupabaseFreeTierWriter } = require("./lib/doraemon-free-tier.js");
+const { createDoraemonFeatureStore } = require("./lib/doraemon-feature-store.js");
+const { FEATURE_NAMES, parseFeatureStartPayload } = require("./lib/doraemon-feature-selection.js");
+const {
+  mainRoomMessage,
+  mainRoomKeyboard,
+  selectionMessage,
+  selectionKeyboard,
+} = require("./lib/doraemon-rooms.js");
+const {
+  handleDoraemonRoomCallback,
+  handleDoraemonShortcutCommand,
+} = require("./lib/doraemon-room-handler.js");
+const {
+  handleDoraemonFeatureMessage,
+  handleDoraemonCommandMessage,
+  todayMessage: doraemonTodayMessage,
+  resultKeyboard: doraemonResultKeyboard,
+} = require("./lib/doraemon-workflow.js");
+const {
+  doraemonWelcomeMessage,
+  doraemonWelcomeKeyboard,
+} = require("./lib/doraemon-welcome.js");
+const { recordCost } = require("./lib/ledger.js");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder"); // apiKey unused by constructEvent
+const SUPA_URL = process.env.SUPABASE_URL, SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const COMPOSIO_KEY = process.env.COMPOSIO_API_KEY;
+const LM_INBOUND_SECRET = process.env.LM_INBOUND_SECRET || ""; // shared secret in the Resend inbound webhook URL
+
+const LM_TG_TOKEN = process.env.LM_TELEGRAM_BOT_TOKEN || "";
+const LM_TG_SECRET = process.env.LM_TELEGRAM_WEBHOOK_SECRET || "";
+const LM_CODEX_ENABLED = process.env.LM_CODEX_BRIDGE_ENABLED === "1";
+const LM_CODEX_BRIDGE_TOKEN = process.env.LM_CODEX_BRIDGE_TOKEN || "";
+const LM_LATE_APPROVAL_CALLBACK_SECRET = process.env.LM_LATE_APPROVAL_CALLBACK_SECRET
+  || process.env.LM_UID_SECRET || undefined;
+const PUBLIC_BASE = publicBaseUrl(process.env) || "";
+const LM_WEB_ORIGIN = process.env.LM_WEB_ORIGIN
+  ? publicBaseUrl({ LM_PUBLIC_URL: process.env.LM_WEB_ORIGIN })
+  : PUBLIC_BASE;
+// The panel is served by this life-call HTTP service, not by the /lm onboarding site.
+// Railway supplies RAILWAY_PUBLIC_DOMAIN; LM_PANEL_BASE_URL is the explicit override for custom domains.
+const LM_PANEL_BASE = process.env.LM_PANEL_BASE_URL ||
+  publicBaseUrl(process.env);
+// Public Telegram links stay disabled until this process has verified the token identity and the
+// webhook registration. A configured username by itself is not evidence that the bot is usable.
+let VERIFIED_TG_USERNAME = "";
+let DORAEMON_STARS_SERVICE = null;
+let DORAEMON_FREE_TIER_WRITER = null;
+let DORAEMON_FEATURE_STORE = null;
+
+function codexStore() {
+  if (!SUPA_URL || !SUPA_KEY) throw new Error("codex store unavailable");
+  return createSupabaseCodexJobStore({ supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+}
+
+function validCodexBridgeRequest(req) {
+  const header = String(req.headers.authorization || "");
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  const presented = match ? match[1].trim() : "";
+  const expected = String(LM_CODEX_BRIDGE_TOKEN || "");
+  if (!expected || !presented || presented.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+}
+
+function jsonResponse(res, status, value) {
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+  });
+  res.end(JSON.stringify(value));
+}
+
+function escapeTelegramHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function codexResultMessage(job) {
+  const isFeature = job.job_kind === "doraemon_feature" && FEATURE_NAMES[job.feature_key];
+  const isCommand = job.job_kind === "doraemon_command";
+  const heading = isCommand
+    ? (job.status === "completed" ? "✅ 総合司令室の下書きができました" : "⚠️ 総合司令室の作業を完了できませんでした")
+    : isFeature
+    ? (job.status === "completed"
+      ? `✅ ${FEATURE_NAMES[job.feature_key]}の下書きができました`
+      : `⚠️ ${FEATURE_NAMES[job.feature_key]}の作業を完了できませんでした`)
+    : (job.status === "completed" ? "✅ Codexの結果" : "⚠️ Codexの実行結果");
+  const raw = String(job.result || "");
+  const result = raw.length > 3_700 ? `${raw.slice(0, 3_700)}\n\n…結果が長いため、ここまで表示しました。` : raw;
+  const boundary = (isFeature || isCommand) ? "\n\n<i>下書きです。外部への公開・送信・決済は行っていません。</i>" : "";
+  return `${heading}\nJob: <code>${escapeTelegramHtml(String(job.id).slice(0, 8))}</code>\n\n${escapeTelegramHtml(result)}${boundary}`;
+}
+
+async function handleCodexNextRequest(req, res) {
+  if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }); res.end("method"); return; }
+  if (!validCodexBridgeRequest(req)) { res.writeHead(401); res.end("unauthorized"); return; }
+  if (!LM_CODEX_ENABLED) { jsonResponse(res, 503, { error: "codex_bridge_disabled" }); return; }
+  try {
+    const job = await codexStore().claim(900);
+    jsonResponse(res, 200, { job: job || null });
+  } catch (error) {
+    console.error(`[codex] claim failed: ${error && error.message || "unknown"}`);
+    jsonResponse(res, 503, { error: "codex_queue_unavailable" });
+  }
+}
+
+async function handleCodexResultRequest(req, res, id) {
+  if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }); res.end("method"); return; }
+  if (!validCodexBridgeRequest(req)) { res.writeHead(401); res.end("unauthorized"); return; }
+  if (!LM_CODEX_ENABLED) { jsonResponse(res, 503, { error: "codex_bridge_disabled" }); return; }
+  try {
+    const store = codexStore();
+    let job = await store.read(id);
+    if (!job) { jsonResponse(res, 404, { error: "codex_job_not_found" }); return; }
+    if (job.status === "claimed") {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      const status = body && (body.status === "completed" || body.status === "failed") ? body.status : null;
+      const result = body && typeof body.result === "string" ? body.result.trim() : "";
+      if (!status || !result || result.length > 16_000) {
+        jsonResponse(res, 400, { error: "codex_result_invalid" }); return;
+      }
+      let safety = null;
+      try {
+        safety = normalizeSafetyReport(job, body.safety, status);
+      } catch {
+        jsonResponse(res, 400, { error: "codex_safety_report_invalid" }); return;
+      }
+      job = await store.finish(id, {
+        status,
+        result: decorateSafetyResult(result, safety),
+        exitCode: body.exitCode,
+        codexSessionId: body.codexSessionId,
+      }) || await store.read(id);
+      if (!job || !["completed", "failed"].includes(job.status)) {
+        jsonResponse(res, 409, { error: "codex_job_claim_lost" }); return;
+      }
+    }
+    // A result may have been stored just before a Telegram transient failure. Re-posting the same
+    // result is idempotent until the durable Telegram message receipt is present.
+    if (job.telegram_result_message_id) {
+      jsonResponse(res, 200, { ok: true, status: "already_sent", telegramMessageId: job.telegram_result_message_id }); return;
+    }
+    const keyboard = doraemonResultKeyboard(job);
+    const sent = await sendMessage(LM_TG_TOKEN, job.telegram_chat_id, codexResultMessage(job),
+      keyboard ? { reply_markup: keyboard } : undefined);
+    const messageId = sent && sent.ok && sent.result && sent.result.message_id;
+    if (!Number.isSafeInteger(messageId) || messageId <= 0) {
+      jsonResponse(res, 502, { error: "telegram_result_send_failed" }); return;
+    }
+    const recorded = await store.markTelegramSent(id, messageId);
+    if (!recorded) { jsonResponse(res, 409, { error: "codex_result_receipt_failed" }); return; }
+    jsonResponse(res, 200, { ok: true, status: "sent", telegramMessageId: messageId });
+  } catch (error) {
+    console.error(`[codex] result failed: ${error && error.message || "unknown"}`);
+    jsonResponse(res, 503, { error: "codex_result_unavailable" });
+  }
+}
+
+function doraemonStarsService() {
+  if (DORAEMON_STARS_SERVICE) return DORAEMON_STARS_SERVICE;
+  if (process.env.LM_DORAEMON_STARS_ENABLED !== "1"
+      || !LM_TG_TOKEN || !SUPA_URL || !SUPA_KEY
+      || !process.env.LM_DORAEMON_STARS_AMOUNT || !process.env.LM_DORAEMON_STARS_PAYLOAD) {
+    return null;
+  }
+  try {
+    DORAEMON_STARS_SERVICE = createDoraemonStarsService({
+      env: process.env,
+      telegramApi: (method, body) => tgCall(LM_TG_TOKEN, method, body),
+      markPaid: createSupabaseStarsEntitlementWriter({ supaUrl: SUPA_URL, supaKey: SUPA_KEY }),
+      markRefunded: createSupabaseStarsRevocationWriter({ supaUrl: SUPA_URL, supaKey: SUPA_KEY }),
+    });
+    return DORAEMON_STARS_SERVICE;
+  } catch (error) {
+    console.error(`[dora-stars] configuration unavailable: ${error && error.code || "invalid"}`);
+    return null;
+  }
+}
+
+function doraemonFreeTierWriter() {
+  if (DORAEMON_FREE_TIER_WRITER) return DORAEMON_FREE_TIER_WRITER;
+  if (!SUPA_URL || !SUPA_KEY) return null;
+  try {
+    DORAEMON_FREE_TIER_WRITER = createSupabaseFreeTierWriter({ supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+    return DORAEMON_FREE_TIER_WRITER;
+  } catch {
+    return null;
+  }
+}
+
+function doraemonFeatureStore() {
+  if (DORAEMON_FEATURE_STORE) return DORAEMON_FEATURE_STORE;
+  if (!SUPA_URL || !SUPA_KEY) return null;
+  try {
+    DORAEMON_FEATURE_STORE = createDoraemonFeatureStore({ supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+    return DORAEMON_FEATURE_STORE;
+  } catch {
+    return null;
+  }
+}
+
+async function doraemonSelectionForChat(chatId) {
+  const store = doraemonFeatureStore();
+  if (!store) return { uid: null, row: null, keys: [] };
+  const row = await rowByChatId(String(chatId || ""), SUPA_URL, SUPA_KEY);
+  if (!row || !row.uid) return { uid: null, row: null, keys: [] };
+  const keys = await store.get(row.uid);
+  return { uid: row.uid, row, keys };
+}
+
+async function sendDoraemonToday(chatId) {
+  const jobs = await codexStore().listRecentByChat(String(chatId || ""), 10);
+  return sendMessage(LM_TG_TOKEN, String(chatId || ""), doraemonTodayMessage(jobs));
+}
+
+function doraemonPrivateContext(update, parsed) {
+  const message = update && (update.message || update.edited_message);
+  return {
+    chatType: message && message.chat ? String(message.chat.type || "") : "private",
+    chatId: parsed && parsed.chatId ? parsed.chatId : parsed && parsed.userId,
+    userId: parsed && parsed.userId,
+  };
+}
+
+function doraemonTermsUrl() {
+  try {
+    const value = String(process.env.DORAEMON_TERMS_URL || "https://effect-os-verified.kirin-999.chatgpt.site/legal");
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password ? url.toString() : null;
+  } catch { return null; }
+}
+
+async function sendDoraemonTerms(chatId) {
+  const termsUrl = doraemonTermsUrl();
+  const rows = [];
+  if (termsUrl) rows.push([{ text: "利用条件・返金方針を読む", url: termsUrl }]);
+  rows.push([{ text: "規約に同意して購入へ進む", callback_data: "dora:agree" }]);
+  return sendMessage(LM_TG_TOKEN, chatId,
+    "<b>avocadomini 購入前の確認</b>\n\nデジタルサービスの利用条件、提供時期、返金方針を確認してください。下の同意ボタンを押すと、Telegram Starsの購入画面へ進みます。購入に関する問題は当Botの /paysupport で対応し、Telegram運営のサポートでは対応できません。",
+    { reply_markup: { inline_keyboard: rows } });
+}
+
+async function sendDoraemonFreeNotice(chatId) {
+  const sent = await sendMessage(LM_TG_TOKEN, chatId, [
+    doraemonWelcomeMessage(),
+  ].join("\n"), { reply_markup: doraemonWelcomeKeyboard() });
+  if (!sent || sent.ok !== true) throw new Error("doraemon welcome message send failed");
+  return sent;
+}
+
+function upgradeConnectorFromCallback(value, stage) {
+  const prefix = `dora:upgrade:${stage ? `${stage}:` : ""}`;
+  const text = String(value || "");
+  if (!text.startsWith(prefix)) return null;
+  try {
+    const connector = requireCommerceConnector(text.slice(prefix.length));
+    return Buffer.byteLength(text) <= 64 ? connector : null;
+  } catch { return null; }
+}
+
+// inngestServeAllowed: pure helper — returns true when the /api/inngest route may serve requests.
+// In dev (INNGEST_DEV=1) it always returns true; in prod it requires INNGEST_SIGNING_KEY.
+// Exported for testing (FIND-005).
+function inngestServeAllowed(env) {
+  const isDev = String((env || {}).INNGEST_DEV || "").trim() === "1";
+  if (isDev) return true;
+  return Boolean((env || {}).INNGEST_SIGNING_KEY);
+}
+
+// stripeWebhookAllowed: mirrors inngestServeAllowed — dev (STRIPE_DEV=1) serves without a secret; prod
+// requires STRIPE_WEBHOOK_SECRET else 503 fail-closed (REQ-41). Exported-shape pure helper for testing.
+function stripeWebhookAllowed(env) {
+  const isDev = String((env || {}).STRIPE_DEV || "").trim() === "1";
+  if (isDev) return true;
+  return Boolean((env || {}).STRIPE_WEBHOOK_SECRET);
+}
+
+// dunningNotify(uid): best-effort ONE message when a subscription goes past_due (REQ-40). Telegram if we
+// have the user's chat, else logged (email is a later enhancement). NEVER throws (dunning must not 500 the webhook).
+async function dunningNotify(uid) {
+  try {
+    if (!SUPA_URL || !SUPA_KEY) return;
+    const r = await fetch(`${SUPA_URL}/rest/v1/lm_users?uid=eq.${encodeURIComponent(uid)}&select=telegram_chat_id,email`,
+      { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } });
+    const d = await r.json().catch(() => []);
+    const row = Array.isArray(d) && d[0] ? d[0] : null;
+    const msg = "⚠️ Your Rockstar_ibot payment didn't go through. Update your card to keep your wake calls active.";
+    if (row && row.telegram_chat_id && LM_TG_TOKEN) await sendMessage(LM_TG_TOKEN, row.telegram_chat_id, msg);
+    else console.log("[stripe] dunning (no telegram channel) uid=", uid, "email=", row && row.email);
+  } catch (e) { console.error("[stripe] dunning err", e.message); }
+}
+
+const LM_UID_SECRET = process.env.LM_UID_SECRET || "";
+const LM_FEEDBACK_PROVENANCE_KEY = process.env.LM_FEEDBACK_PROVENANCE_KEY || LM_UID_SECRET;
+const LM_FEEDBACK_STORE = process.env.LM_FEEDBACK_DATABASE_URL
+  ? createPostgresFeedbackStore(process.env.LM_FEEDBACK_DATABASE_URL)
+  : null;
+function verifyUid(uid, sig) {
+  if (!LM_UID_SECRET || !uid || !sig) return false;
+  const expected = crypto.createHmac("sha256", LM_UID_SECRET).update(uid).digest("base64url");
+  const a = Buffer.from(String(sig)), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+// SERVER-SIDE rate-limit for /test-call. The dashboard "Call me now" button disables after one tap, but
+// that gate is client-side ONLY — a page reload resets it, so a user could otherwise spam billed Charon
+// calls. Every test call is real money, so we enforce the limit here (single always-on process → a Map is
+// authoritative). Cooldown stops reload-spam; the daily cap bounds total cost per user.
+const TEST_CALL_COOLDOWN_MS = 10 * 60 * 1000; // 1 test call per uid per 10 min
+const TEST_CALL_DAILY_MAX = 5;                // hard ceiling per uid per rolling 24h
+const _testCallLog = new Map();               // uid -> [epoch ms]
+function testCallAllowed(uid, now = Date.now()) {
+  const arr = (_testCallLog.get(uid) || []).filter((t) => now - t < 24 * 3600 * 1000);
+  const last = arr[arr.length - 1];
+  if (last !== undefined && now - last < TEST_CALL_COOLDOWN_MS) {
+    return { ok: false, retryAfter: Math.ceil((TEST_CALL_COOLDOWN_MS - (now - last)) / 1000) };
+  }
+  if (arr.length >= TEST_CALL_DAILY_MAX) return { ok: false, retryAfter: 3600 };
+  arr.push(now);
+  _testCallLog.set(uid, arr);
+  return { ok: true };
+}
+async function userForUid(uid) {
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  // phone (to dial) + call_language (user-chosen call language, may be null → fall back to phone) +
+  // name (so the call can address them by name).
+  const r = await fetch(`${url}/rest/v1/lm_users?uid=eq.${encodeURIComponent(uid)}&select=phone,call_language,name,gmail_account_id`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  const d = await r.json().catch(() => []);
+  return Array.isArray(d) && d[0] ? d[0] : null;
+}
+function readBody(req) {
+  return new Promise((resolve) => {
+    let b = ""; req.on("data", (c) => { b += c; if (b.length > 1e5) req.destroy(); });
+    req.on("end", () => resolve(b)); req.on("error", () => resolve(""));
+  });
+}
+// readRawBody: collect the EXACT bytes as a Buffer (no utf8 string concat, which corrupts multi-byte chars
+// split across chunks → Stripe signature mismatch). Used for the Stripe webhook where constructEvent must
+// hash the raw bytes (FIND-005).
+function readRawBody(req) {
+  return new Promise((resolve) => {
+    const chunks = []; let len = 0;
+    req.on("data", (c) => { chunks.push(c); len += c.length; if (len > 1e5) req.destroy(); });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", () => resolve(Buffer.alloc(0)));
+  });
+}
+
+// One tag, two readers (/health and the boot line). It was written out twice before, so a deploy
+// could report one build to curl and another to the logs — the pair of them is the only way to tell
+// live code apart from a deploy that never happened, and a pair that can disagree proves nothing.
+const BUILD_TAG = String(process.env.LM_BUILD_SHA || "doraemon-free-stars-v2");
+const PORT = Number(process.env.PORT) || 8788;
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const DEBUG_TRANSCRIPTS = process.env.DEBUG_TRANSCRIPTS === "1";
+const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT_CALLS) || 8;
+const VALID_URGENCY = new Set(["gentle", "firm", "harsh"]);
+let liveCalls = 0;
+
+// Build a GCal-shaped event ({summary,start:{dateTime},location}) + urgency from the /ws query —
+// AND authenticate it. Each Telnyx media stream carries its own signed context; an unsigned or
+// tampered connection is rejected before any Gemini socket opens (no budget drain, no prompt
+// injection). Returns null when the HMAC (over summary|dateTime|location|urgency, keyed by
+// LM_CALL_SECRET) does not verify.
+function ctxFromReq(req) {
+  let q;
+  try {
+    q = new URL(req.url, "http://x").searchParams;
+  } catch {
+    return null;
+  }
+  const summary = (q.get("summary") || "").slice(0, 200);
+  const dateTime = (q.get("dateTime") || "").slice(0, 40);
+  const location = (q.get("location") || "").slice(0, 200);
+  let urgency = q.get("urgency") || "gentle";
+  if (!VALID_URGENCY.has(urgency)) urgency = "gentle";
+  let lang = q.get("lang");
+  if (lang !== "ja" && lang !== "en") lang = "en"; // call language follows the user (JP→ja, else en)
+  const name = (q.get("name") || "").slice(0, 60); // who to address on the call (already sanitized when signed)
+  const wakeUid = (q.get("wakeUid") || "").slice(0, 100);
+  const wakeEventKey = (q.get("wakeEventKey") || "").slice(0, 300);
+  const sig = q.get("sig") || "";
+
+  const secret = process.env.LM_CALL_SECRET || "";
+  const expected = crypto.createHmac("sha256", secret).update([summary, dateTime, location, urgency, lang, name, wakeUid, wakeEventKey].join("\n")).digest("base64url");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (!secret || a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+  return { event: { summary, start: { dateTime }, location }, urgency, lang, name, wakeUid, wakeEventKey };
+}
+
+const server = http.createServer((req, res) => {
+  const path = (req.url || "").split("?")[0];
+  if (path === "/doraemon" || path === "/doraemon/") {
+    if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }); res.end("method"); return; }
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    res.end(purchasePage({ botUsername: VERIFIED_TG_USERNAME }));
+    return;
+  }
+  if (path === "/doraemon/complete") {
+    if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }); res.end("method"); return; }
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+    res.end(completePage());
+    return;
+  }
+  if (path === "/api/doraemon/checkout") {
+    if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }); res.end("method"); return; }
+    createPurchaseClaim({ supaUrl: SUPA_URL, supaKey: SUPA_KEY }).then((claim) => {
+      res.writeHead(201, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "set-cookie": claim.cookie,
+        "x-content-type-options": "nosniff",
+      });
+      res.end(JSON.stringify({ url: claim.checkoutUrl }));
+    }).catch((error) => {
+      console.error("[doraemon] checkout unavailable", error.message);
+      res.writeHead(503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "checkout_unavailable" }));
+    });
+    return;
+  }
+  if (path === "/api/doraemon/purchase-status") {
+    if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }); res.end("method"); return; }
+    const sessionId = new URL(req.url, "http://x").searchParams.get("session_id") || "";
+    const token = doraemonCookieValue(req.headers.cookie, CLAIM_COOKIE);
+    purchaseStatus({ sessionId, token }, {
+      supaUrl: SUPA_URL,
+      supaKey: SUPA_KEY,
+      botUsername: VERIFIED_TG_USERNAME,
+    }).then((result) => {
+      res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+      res.end(JSON.stringify(result));
+    }).catch(() => {
+      res.writeHead(503, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ status: "unavailable" }));
+    });
+    return;
+  }
+  // Public identity only: clients may discover the installation-owned bot without ever receiving
+  // its token or webhook secret. An unconfigured installation returns null rather than falling back
+  // to the former shared Rockstar_ibot bot.
+  if (path === "/api/public/telegram") {
+    if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }); res.end("method"); return; }
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(telegramPublicConfig({
+      ...process.env,
+      LM_TELEGRAM_BOT_USERNAME: VERIFIED_TG_USERNAME,
+    })));
+    return;
+  }
+  if (path === "/api/panel/session/telegram" || path === "/api/panel/session/device") {
+    handlePanelRequest(req, res, {
+      supaUrl: SUPA_URL, supaKey: SUPA_KEY, token: LM_TG_TOKEN,
+      panelOrigin: LM_PANEL_BASE, panelBaseUrl: LM_PANEL_BASE,
+      botUsername: VERIFIED_TG_USERNAME,
+    }).catch((error) => {
+      console.error("[panel-auth] request failed", error.message);
+      if (!res.headersSent) res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "panel_auth_unavailable" }));
+    });
+    return;
+  }
+  if (path === "/api/panel/onboarding/calendar/start" || path === "/api/panel/onboarding/calendar/status") {
+    handleCalendarOnboardRequest(req, res, {
+      supaUrl: SUPA_URL,
+      supaKey: SUPA_KEY,
+      panelOrigin: LM_PANEL_BASE,
+      panelBaseUrl: LM_PANEL_BASE,
+      sessionSecret: process.env.LM_PANEL_SESSION_ROTATION_SECRET || process.env.LM_UID_SECRET,
+      composioKey: COMPOSIO_KEY,
+      composioAuthConfig: process.env.COMPOSIO_GCAL_AUTH_CONFIG,
+    }).catch(() => {
+      if (!res.headersSent) res.writeHead(502, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "calendar_unavailable" }));
+    });
+    return;
+  }
+  if (path.startsWith("/api/panel/")) {
+    handlePanelApiRequest(req, res, {
+      supaUrl: SUPA_URL,
+      supaKey: SUPA_KEY,
+      timeZone: process.env.LM_TIME_ZONE || "Asia/Tokyo",
+      panelOrigin: LM_PANEL_BASE,
+      panelBaseUrl: LM_PANEL_BASE,
+      composioKey: COMPOSIO_KEY,
+      composioAuthConfig: process.env.COMPOSIO_GCAL_AUTH_CONFIG,
+    }).catch((error) => {
+      console.error("[panel-api] request failed", error.message);
+      if (!res.headersSent) res.writeHead(500, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "panel_unavailable" }));
+    });
+    return;
+  }
+  if (path === "/panel" || path === "/panel/onboarding" || path === "/panel/logout") {
+    handlePanelRequest(req, res, { supaUrl: SUPA_URL, supaKey: SUPA_KEY, token: LM_TG_TOKEN, panelOrigin: LM_PANEL_BASE, panelBaseUrl: LM_PANEL_BASE, botUsername: VERIFIED_TG_USERNAME }).catch((error) => {
+      console.error("[panel] request failed", error.message);
+      if (!res.headersSent) res.writeHead(500, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+      res.end("panel unavailable");
+    });
+    return;
+  }
+  if (path === "/panel/oauth/calendar") {
+    handlePanelOAuthCallback(req, res, { supaUrl: SUPA_URL, supaKey: SUPA_KEY, composioKey: COMPOSIO_KEY }).catch(() => {
+      if (!res.headersSent) res.writeHead(500, { "content-type": "text/plain", "cache-control": "no-store" });
+      res.end("oauth callback unavailable");
+    });
+    return;
+  }
+  if (path === "/health" || path === "/") {
+    res.writeHead(200, { "content-type": "application/json" });
+    // `build` lets any deploy be verified from outside (curl /health) — proves new code is live.
+    res.end(JSON.stringify({ ok: true, service: "life-call", ws: "/ws", build: BUILD_TAG }));
+    return;
+  }
+  // Telnyx Call Control webhook. Standard AMD produces call.machine.detection.ended with
+  // data.payload.result=human|machine|not_sure. Only an authenticated, explicit human result may
+  // mark the correlated wake row answered; call.answered and media start are not human proof.
+  if (path === "/telnyx-events") {
+    if (req.method !== "POST") { res.writeHead(405); res.end("method"); return; }
+    if (!process.env.TELNYX_PUBLIC_KEY) { res.writeHead(503); res.end("telnyx public key not configured"); return; }
+    (async () => {
+      const rawBody = await readRawBody(req);
+      const verified = verifyTelnyxSignature({
+        rawBody,
+        signature: req.headers["telnyx-signature-ed25519"],
+        timestamp: req.headers["telnyx-timestamp"],
+        publicKey: process.env.TELNYX_PUBLIC_KEY,
+      });
+      if (!verified) { res.writeHead(403); res.end("invalid signature"); return; }
+
+      let event;
+      try { event = JSON.parse(rawBody.toString("utf8")); }
+      catch { res.writeHead(400); res.end("invalid json"); return; }
+      const data = event && event.data;
+      const payload = data && data.payload;
+      if (!data || data.event_type !== "call.machine.detection.ended" || !payload) {
+        res.writeHead(200); res.end("ignored"); return;
+      }
+      const call = decodeCallClientState(payload.client_state);
+      // spec §3 row 2d: a /test-call detection arrives here too, and it is handled BEFORE the wake
+      // path because it has no lm_wake_log row to write on — the code below would PATCH nothing and
+      // report matched=0 forever. It still costs the same money on a voicemail, so it still hangs up.
+      if (call && call.kind === "test") {
+        const detection = await applyTestCallDetection({
+          result: payload.result, callControlId: payload.call_control_id,
+        });
+        const tag = `test=${call.testUid.slice(0, 12)} result=${detection.result || "missing"}`;
+        // Logged apart from the wake path's writes for the same reason the wake hangup is: this fails
+        // against Telnyx, not Supabase, and it costs money rather than evidence. Silence would put us
+        // back at "we are paying for two minutes of voicemail and nothing says we tried to stop it".
+        if (detection.hangup && !detection.hangup.ok) {
+          console.error(`[telnyx-events] test-call hangup FAILED (${detection.hangup.error}) ${tag} — still speaking to a machine`);
+        } else if (detection.hangup) {
+          console.log(`[telnyx-events] test-call hung up on a ${detection.result} ${tag}`);
+        } else {
+          console.log(`[telnyx-events] test-call ${tag}; left running`);
+        }
+        res.writeHead(200); res.end(detection.hangup ? "test hangup" : "test noop"); return;
+      }
+      const wake = call && call.kind === "wake" ? call : null;
+      if (!wake) {
+        // Not one of our calls, or a client_state we cannot decode. Either way nothing correlates, and
+        // saying so out loud beats writing amd_result onto no row at all.
+        console.log(`[telnyx-events] AMD result=${payload.result || "missing"}; no wake context`);
+        res.writeHead(200); res.end("no wake context"); return;
+      }
+      // spec §3 row 2: persist EVERY detection, not only human ones. amd_result='machine' is a
+      // voicemail we reached; amd_result IS NULL is a webhook that never arrived. Before this, both
+      // were answered_at IS NULL and a rotated signing key would have gone unnoticed forever.
+      // spec §3 row 2b / §5.2.1: the same event that tells us it is a machine also carries the handle
+      // needed to end the call. `data.payload.call_control_id` is on every call.machine.detection.ended
+      // (Telnyx sample webhook, team-telnyx/demo-node-telnyx voicemail-detection/contentful.md) — the
+      // same identifier placeCall returns as `ccid` and the bridge already uses for record_start.
+      const detection = await applyAmdDetection(wake.wakeUid, wake.wakeEventKey, {
+        result: payload.result, supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+        callControlId: payload.call_control_id,
+      });
+      const tag = `wake=${wake.wakeUid.slice(0, 12)} result=${detection.result || "missing"}`;
+      // The three outcomes get three different lines, and only one of them is routine. A write that
+      // matched no row and a write that never landed are different failures and must not share a log.
+      const report = (what, r) => {
+        if (!r.ok) console.error(`[telnyx-events] ${what} PATCH FAILED (${r.error}) ${tag} — lm_wake_log NOT updated`);
+        else if (r.matched === 0) console.error(`[telnyx-events] ${what} matched NO ROW ${tag} — wake row missing or already latched`);
+        else console.log(`[telnyx-events] ${what} written rows=${r.matched} ${tag}`);
+      };
+      report("amd_result", detection.amd);
+      if (detection.answered) report("answered_at", detection.answered);
+      // The hangup is best-effort and is logged apart from the writes above, because it fails for a
+      // different reason (Telnyx, not Supabase) and costs a different thing: money, never evidence.
+      // Silence here would put us back where we started — paying for two minutes of voicemail with
+      // nothing anywhere saying we tried to stop it.
+      if (detection.hangup && !detection.hangup.ok) {
+        console.error(`[telnyx-events] hangup FAILED (${detection.hangup.error}) ${tag} — still speaking to a machine`);
+      } else if (detection.hangup) {
+        console.log(`[telnyx-events] hung up on a ${detection.result} ${tag}`);
+      }
+      // spec §3 row 2a: Telnyx reads 2xx as "it arrived" and redelivers ONLY when it gets something
+      // else (developers.telnyx.com/development/api-fundamentals/webhooks/receiving-webhooks: "All
+      // response codes outside this range... will indicate to Telnyx that you did not receive the
+      // webhook"; up to 3 primary + 3 failover attempts, exponential backoff). This route used to
+      // answer 200 no matter what happened, so a Supabase outage silently threw away the last copy of
+      // a detection: the retry was ours to take and we declined it, and the row stayed NULL forever —
+      // indistinguishable from a webhook that never arrived, which is the §1.3 failure class.
+      //
+      // The line drawn here is ONLY "did the write land" vs "did it land and match nothing", because
+      // that is the only distinction patchWakeLog gives us. Be honest about how coarse that is:
+      // {ok:false} folds together the transient (5xx, thrown fetch) and the permanent — an http_400
+      // from schema drift, an http_401 from a rotated service-role key, unreadable_response,
+      // missing_args, and recordAmdResult's missing_result (an empty AMD result, which late-notice.js
+      // argues at length is OUR parse failure and not a verdict). All of those now ask for a resend
+      // and will fail identically on all six attempts. The price of that bluntness: a wasted delivery
+      // budget, the failover URL rung for nothing, and a schema typo that looks exactly like an
+      // outage. It is accepted for now because the alternative — 200 on a real outage — destroys the
+      // only copy of a detection, and a wasted retry destroys nothing. The proper fix is to make
+      // patchWakeLog say WHICH kind of failure it had (retryable vs permanent) and to escalate only
+      // the first; do that there, not by widening this branch, or the two will drift.
+      //   * !ok → 5xx, and Telnyx brings the same event back. Reprocessing is safe because the
+      //     payload is identical apart from meta.attempt: amd_result is written with no filter (last
+      //     observation wins) and answered_at is an is.null latch (the first human proof wins).
+      //   * matched === 0 = the write LANDED and correctly changed nothing: there is no row for this
+      //     uid+event_key, and no future delivery can conjure one. 200 closes it. Retrying would
+      //     spend six deliveries on nothing and bury the real outages above.
+      if (!detection.amd.ok) {
+        res.writeHead(503, { "content-type": "text/plain" });
+        res.end("record failed; send it again");
+        return;
+      }
+      // A failed answered_at write deliberately does NOT ask for a retry — and NOT because a later
+      // write would be a no-op. It would not be: the latch is answered_at=is.null, so if the first
+      // write never landed the column is still NULL and a resent write lands perfectly well. The real
+      // reasons are three: (1) this only runs after amd_result succeeded, so a retry rewrites that
+      // good amd_result once per attempt to chase a second column; (2) the timestamp it would write
+      // is the retry's clock, minutes off down the exponential backoff — a worse answer than none;
+      // (3) amd_result='human' already records that a human picked up, so the fact is not lost, only
+      // its exact second is. report() above puts the failure in stderr.
+      const outcome = detection.answered
+        ? (detection.answered.matched > 0 ? "answered" : "answered_at unchanged")
+        : "recorded";
+      res.writeHead(200); res.end(outcome);
+    })().catch((error) => {
+      console.error("[telnyx-events] error", error && error.message);
+      if (!res.headersSent) { res.writeHead(500); res.end("error"); }
+    });
+    return;
+  }
+  // GET /gmail-connect — signed Telegram deep link into the existing real Unipile hosted-auth flow.
+  // A provider/config failure is an explicit error; this route never claims Gmail was connected.
+  if (path === "/gmail-connect") {
+    if (req.method !== "GET") { res.writeHead(405); res.end("method"); return; }
+    (async () => {
+      const q = new URL(req.url, "http://x").searchParams;
+      const uid = q.get("uid") || "";
+      if (!verifyUid(uid, q.get("sig") || "")) { res.writeHead(403); res.end("bad uid signature"); return; }
+      const user = await userForUid(uid);
+      if (!await mailAvailable(user)) { res.writeHead(503); res.end("Gmail integration is currently being prepared"); return; }
+      const redirect = await createHostedGmailLink(uid, {
+        dsn: process.env.UNIPILE_DSN, token: process.env.UNIPILE_TOKEN,
+        notifySecret: process.env.UNIPILE_NOTIFY_SECRET,
+        publicBase: PUBLIC_BASE,
+      });
+      if (!redirect) { res.writeHead(503); res.end("Gmail connection is temporarily unavailable"); return; }
+      res.writeHead(302, { Location: redirect }); res.end();
+    })().catch((error) => { console.error("[gmail-onboard]", error.message); res.writeHead(503); res.end("Gmail connection is temporarily unavailable"); });
+    return;
+  }
+  // POST /test-call {uid,sig} — the dashboard "Call me now" button. Auth'd by the same HMAC uid+sig
+  // the /lm app already holds; we look up the user's phone and place an immediate Charon call so they
+  // hear, right then, that the wake calls work. CORS is limited to this installation's configured web origin.
+  if (path === "/test-call") {
+    if (LM_WEB_ORIGIN) res.setHeader("Access-Control-Allow-Origin", LM_WEB_ORIGIN);
+    res.setHeader("Access-Control-Allow-Headers", "content-type");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+    if (req.method !== "POST") { res.writeHead(405); res.end("method"); return; }
+    (async () => {
+      const reply = (code, obj) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+      try {
+        const body = JSON.parse((await readBody(req)) || "{}");
+        if (!verifyUid(body.uid, body.sig)) return reply(403, { error: "bad uid signature" });
+        const u = await userForUid(body.uid);
+        const phone = u && u.phone;
+        if (!phone) return reply(400, { error: "no phone on file" });
+        // Cost guard: enforce the one-time/cooldown SERVER-SIDE (client gate resets on reload). 429 = too soon.
+        const rl = testCallAllowed(body.uid);
+        if (!rl.ok) return reply(429, { error: "rate_limited", retryAfter: rl.retryAfter });
+        // Call language = the user's CHOICE (lm_users.call_language, set via the /lm toggle) if present,
+        // else fall back to the phone country (+81 → ja, else en). Dais 2026-06-22.
+        const lang = resolveCallLang({ callLanguage: u.call_language, phone });
+        // Caller may pass a REAL event (summary/location/urgency) so the call + its recording are
+        // postable content — NEVER hardcode "test" (the assistant reads the summary aloud). Default = a
+        // real morning nudge in the USER's language, not a "test" label.
+        const ev = {
+          summary: (body.summary || (lang === "ja" ? "次のご予定" : "your next appointment")).toString().slice(0, 200),
+          startIso: body.dateTime || new Date(Date.now() + 15 * 60000).toISOString(),
+          location: (body.location || "").toString().slice(0, 200),
+        };
+        const urgency = ["gentle", "firm", "harsh"].includes(body.urgency) ? body.urgency : "gentle";
+        const streamUrl = buildStreamUrl(ev, urgency, lang, u.name);
+        // spec §3 row 2d: say who this call is. The stream URL cannot carry it — its query is signed
+        // by signCtx over a fixed array the /ws bridge re-verifies — so the state rides beside it. An
+        // unnamed call is what made the detection webhook return "no wake context" and let every test
+        // call that hit a voicemail run to the carrier's 120-second recording limit.
+        const result = await placeCall({
+          to: phone, streamUrl, clientState: encodeTestCallClientState({ testUid: body.uid }),
+        });
+        return reply(result.ok ? 200 : 502, result);
+      } catch (e) {
+        return reply(502, { error: String(e) });
+      }
+    })();
+    return;
+  }
+  // Private bridge API: only the local Mac bridge knows the bearer token. The Telegram webhook
+  // itself never exposes Supabase credentials or the local Codex login.
+  if (path === "/internal/codex/jobs/next") {
+    handleCodexNextRequest(req, res).catch((error) => {
+      console.error(`[codex] next endpoint failed: ${error && error.message || "unknown"}`);
+      if (!res.headersSent) jsonResponse(res, 503, { error: "codex_queue_unavailable" });
+    });
+    return;
+  }
+  const codexResultPath = /^\/internal\/codex\/jobs\/([^/]+)\/result$/.exec(path);
+  if (codexResultPath) {
+    handleCodexResultRequest(req, res, decodeURIComponent(codexResultPath[1])).catch((error) => {
+      console.error(`[codex] result endpoint failed: ${error && error.message || "unknown"}`);
+      if (!res.headersSent) jsonResponse(res, 503, { error: "codex_result_unavailable" });
+    });
+    return;
+  }
+  // POST /telegram — the Rockstar_ibot bot webhook. Telegram echoes our secret in a header; reject
+  // anything that doesn't match (so strangers can't post fake updates). /start hands the user to the
+  // web onboarding (deep-linked with their chat id); any other text is treated as a reply to a
+  // pending location ask and routed to the calendar.
+  if (path === "/telegram") {
+    if (req.method !== "POST") { res.writeHead(405); res.end("method"); return; }
+    // Fail CLOSED: no secret configured → reject. Constant-time compare to avoid timing leaks.
+    const hdr = String(req.headers["x-telegram-bot-api-secret-token"] || "");
+    const ok = LM_TG_SECRET.length > 0 && hdr.length === LM_TG_SECRET.length &&
+      crypto.timingSafeEqual(Buffer.from(hdr), Buffer.from(LM_TG_SECRET));
+    if (!ok) { res.writeHead(401); res.end("unauthorized"); return; }
+    (async () => {
+      try {
+        const update = JSON.parse((await readBody(req)) || "{}");
+        const u = parseUpdate(update);
+        if (u && LM_TG_TOKEN) {
+          const stars = doraemonStarsService();
+          if (u.kind === "pre_checkout") {
+            if (!stars) {
+              await tgCall(LM_TG_TOKEN, "answerPreCheckoutQuery", {
+                pre_checkout_query_id: u.preCheckoutQuery && u.preCheckoutQuery.id,
+                ok: false,
+                error_message: "現在、購入処理を利用できません。時間を置いてやり直してください。",
+              });
+              res.writeHead(200); res.end("purchase unavailable");
+              return;
+            }
+            await stars.handlePreCheckoutQuery(u.preCheckoutQuery, {
+              chatType: "private", chatId: u.userId, userId: u.userId,
+            });
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "successful_payment") {
+            if (!stars) { res.writeHead(503); res.end("purchase unavailable"); return; }
+            const paymentResult = await stars.handleSuccessfulPayment(u.successfulPaymentMessage);
+            if (paymentResult.connectorKey) {
+              const paidRow = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+              if (!paidRow || !paidRow.uid) throw new Error("paid_tenant_not_found");
+              const entitlementStore = createCommerceEntitlementStore({ supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+              await entitlementStore.selectTool({ uid: paidRow.uid, connectorKey: paymentResult.connectorKey });
+            }
+            await sendMessage(LM_TG_TOKEN, u.chatId,
+              `✅ <b>Stars決済を確認しました。</b>\n\n10個の販売ツールをこのチャットから操作できます。${paymentResult.connectorKey ? "選んだ4つ目のツールも追加しました。" : ""}\n/tools で一覧を開いてください。`);
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "refunded_payment") {
+            if (!stars) { res.writeHead(503); res.end("refund unavailable"); return; }
+            await stars.handleRefundedPayment(u.refundedPaymentMessage);
+            await sendMessage(LM_TG_TOKEN, u.chatId,
+              "返金を確認し、avocadominiの利用権限を停止しました。確認が必要な場合は /paysupport からご連絡ください。");
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "callback") {
+            if (String(u.data || "") === "dora:free:agree") {
+              await answerCallbackQuery(LM_TG_TOKEN, u.callbackQueryId, "1〜3種類を選んでください");
+              await editMessageText(LM_TG_TOKEN, u.chatId, u.messageId, selectionMessage([]), {
+                reply_markup: selectionKeyboard([]),
+              });
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+            if (String(u.data || "").startsWith("dora:")) {
+              const outcome = await handleDoraemonRoomCallback(u.data, {
+                token: LM_TG_TOKEN,
+                chatType: u.chatType,
+                chatId: u.chatId,
+                actorId: u.userId,
+                messageId: u.messageId,
+                callbackQueryId: u.callbackQueryId,
+                profileName: [u.firstName, u.lastName].filter(Boolean).join(" "),
+              }, {
+                startFreeTier: doraemonFreeTierWriter(),
+                featureStore: doraemonFeatureStore(),
+                codexStore: (SUPA_URL && SUPA_KEY) ? codexStore() : null,
+                loadSelection: () => doraemonSelectionForChat(u.chatId),
+                sendMessage,
+                editMessageText,
+                answerCallbackQuery,
+                runToday: () => sendDoraemonToday(u.chatId),
+              });
+              if (outcome && outcome.handled) {
+                console.log(`[dora-rooms] callback action=${outcome.action || "none"} ok=${outcome.ok === true} reason=${outcome.reason || "none"}`);
+                res.writeHead(200); res.end("ok");
+                return;
+              }
+            }
+            const upgradeConnector = upgradeConnectorFromCallback(u.data, "");
+            if (upgradeConnector) {
+              await answerCallbackQuery(LM_TG_TOKEN, u.callbackQueryId, stars ? "Starsの購入確認を開きます" : "現在準備中です");
+              if (stars) {
+                await stars.sendInvoice(
+                  { chatType: u.chatType, chatId: u.chatId, userId: u.userId },
+                  { connectorKey: upgradeConnector.key },
+                );
+              } else {
+                await sendMessage(LM_TG_TOKEN, u.chatId, "Stars決済は現在準備中です。無料機能はそのまま使えます。");
+              }
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+            if (String(u.data || "") === "dora:terms") {
+              await answerCallbackQuery(LM_TG_TOKEN, u.callbackQueryId, "購入条件を表示します");
+              await sendDoraemonTerms(u.chatId);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+            if (String(u.data || "") === "dora:agree") {
+              await answerCallbackQuery(LM_TG_TOKEN, u.callbackQueryId, stars ? "購入画面を開きます" : "現在準備中です");
+              if (stars) {
+                await stars.sendInvoice({ chatType: "private", chatId: u.chatId, userId: u.userId });
+              } else {
+                await sendMessage(LM_TG_TOKEN, u.chatId, "購入処理は現在準備中です。利用可能になり次第、このチャットでお知らせします。");
+              }
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+            if (String(u.data || "").startsWith("cfo:")) {
+              let uid = null;
+              try {
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                uid = row && typeof row.uid === "string" ? row.uid : null;
+              } catch {}
+              await handleCfoTelegramCallback({
+                data: u.data, uid, chatId: u.chatId, actorId: u.userId,
+                messageId: u.messageId, callbackQueryId: u.callbackQueryId, telegramToken: LM_TG_TOKEN,
+              }, { supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+            await answerCallbackQuery(LM_TG_TOKEN, u.callbackQueryId, "Received");
+            await routeCallbackData(u.data, { ask: async (data) => {
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                return handleAskCallback(data, {
+                  uid: row && row.uid, chatId: u.chatId, actorId: u.userId,
+                  messageId: u.messageId, messageText: u.messageText, callbackQueryId: u.callbackQueryId,
+                  telegramToken: LM_TG_TOKEN,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY, composioKey: COMPOSIO_KEY,
+                  gmailAccountId: row && row.gmail_account_id,
+                });
+              }, gmail: async (data) => {
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                return handleGmailCallback(data, row, {
+                  token: LM_TG_TOKEN, chatId: u.chatId, base: PUBLIC_BASE,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+              }, discovery: async (data) => {
+                // FIN-b: the payout branch needs the uid to know whether this person already told us
+                // where to send money, so the register button can be answered exactly once.
+                const row = /^discovery:register:payout$/.test(String(data || ""))
+                  ? await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY)
+                  : null;
+                const outcome = await handleDiscoveryCallback(data, {
+                  token: LM_TG_TOKEN, chatId: u.chatId, uid: row && row.uid,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+                // Discovery answers were otherwise invisible: nothing recorded which gate the user
+                // responded to, so an unlocked-gate announcement could not be audited after the fact.
+                if (outcome && outcome.handled) {
+                  console.log(`[discovery] callback action=${outcome.action} gate=${outcome.gate}`);
+                }
+                return outcome;
+              }, payout: async (data) => {
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                const outcome = await handlePayoutCallback(data, {
+                  uid: row && row.uid, chatId: u.chatId, actorId: u.userId,
+                  // CB-1 (§10.0-15): the handler edits the tapped message into its answered state
+                  // and replies visibly on a re-tap, which needs the bot token and the original text.
+                  token: LM_TG_TOKEN, messageId: u.messageId, messageText: u.messageText,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+                // Same audit shape as discovery: name the decision, never the person. A failed write
+                // is logged as a failure so a silent non-persist can never look like a registration.
+                if (outcome && outcome.handled) {
+                  console.log(`[payout] callback answer=${outcome.answer} ok=${outcome.ok}${outcome.reason ? ` reason=${outcome.reason}` : ""}`);
+                }
+                return outcome;
+              }, diet: async (data) => {
+                // H2 ORG-diet: the lunch tap. The row is the tenant boundary — handleDietCallback
+                // re-verifies that it names THIS chat before writing, so a lookup bug upstream
+                // fails there instead of filing one person's lunch under another person's uid.
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                const outcome = await handleDietCallback(data, {
+                  row, chatId: u.chatId, actorId: u.userId,
+                  // CB-1 (§10.0-15 ①): the handler edits the question into its answered state, which
+                  // needs the bot token and the original text. No thank-you follows — that edit IS
+                  // the visible response, and the flow does not continue.
+                  token: LM_TG_TOKEN, messageId: u.messageId, messageText: u.messageText,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+                // Name the decision, never the person and never the meal in a way that identifies
+                // them: the answer value is one of four fixed tokens, which is already public shape.
+                if (outcome && outcome.handled) {
+                  console.log(`[diet] callback answer=${outcome.answer} ok=${outcome.ok}${outcome.reason ? ` reason=${outcome.reason}` : ""}`);
+                }
+                return outcome;
+              }, precepts: async (data) => {
+                // H4 ORG-precepts: the bedtime tap. Same tenant boundary as the diet sibling —
+                // handlePreceptsCallback re-verifies that the row names THIS chat before writing,
+                // and this is the ledger where a mis-filed row would attach one person's private
+                // evening to another person's uid.
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                const outcome = await handlePreceptsCallback(data, {
+                  row, chatId: u.chatId, actorId: u.userId,
+                  // CB-1 (§10.0-15 ①): the handler edits the question into its answered state, which
+                  // needs the bot token and the original text. No thank-you follows — that edit IS
+                  // the visible response, and the flow does not continue.
+                  token: LM_TG_TOKEN, messageId: u.messageId, messageText: u.messageText,
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+                // Name the DECISION, never the person. The answer value is one of five fixed tokens,
+                // which is already public shape; the label the user read never reaches the log.
+                if (outcome && outcome.handled) {
+                  console.log(`[precepts] callback answer=${outcome.answer} ok=${outcome.ok}${outcome.reason ? ` reason=${outcome.reason}` : ""}`);
+                }
+                return outcome;
+              }, late: async (data) => {
+                // The row selected by chat id is the tenant boundary.  The signed button authenticates
+                // the draft/action; this lookup authenticates which uid may consume it.  A callback
+                // forwarded into another chat therefore reaches the state machine with the wrong uid
+                // and cannot decide or claim the original draft.
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                const store = createSupabaseLateApprovalStore({
+                  supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+                });
+                const outcome = await handleLateApprovalCallback(data, {
+                  callbackSecret: LM_LATE_APPROVAL_CALLBACK_SECRET,
+                  owner: row,
+                  chatId: u.chatId,
+                  actorId: u.userId,
+                  callbackQueryId: u.callbackQueryId,
+                  messageId: u.messageId,
+                  messageText: u.messageText,
+                  token: LM_TG_TOKEN,
+                  store,
+                  supaUrl: SUPA_URL,
+                  supaKey: SUPA_KEY,
+                  reflectAnswer,
+                  sendMessage,
+                  editMessageText,
+                  resendKey: process.env.RESEND_API_KEY,
+                });
+                if (outcome && outcome.handled) {
+                  console.log(`[late] callback decision=${outcome.decision || "none"} ok=${outcome.ok} sent=${outcome.sent === true} reason=${outcome.reason || "none"}`);
+                }
+                return outcome;
+              }, commerce: async (data) => {
+                const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY);
+                const outcome = await handleCommerceCallback(data, {
+                  row,
+                  token: LM_TG_TOKEN,
+                  chatId: u.chatId,
+                  actorId: u.userId,
+                  messageId: u.messageId,
+                  messageText: u.messageText,
+                }, {
+                  supaUrl: SUPA_URL,
+                  supaKey: SUPA_KEY,
+                  starsAmount: stars && stars.config ? stars.config.amount : null,
+                  sendMessage,
+                  editMessageText,
+                });
+                if (outcome && outcome.handled) {
+                  console.log(`[commerce] callback action=${outcome.action || "none"} ok=${outcome.ok === true} reason=${outcome.reason || "none"}`);
+                }
+                return outcome;
+              } });
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          const purchaseToken = u.kind === "message" ? telegramClaimToken(u.text) : null;
+          if (purchaseToken) {
+            const profileName = [u.firstName, u.lastName].filter(Boolean).join(" ");
+            const claim = await consumePurchaseClaim({
+              token: purchaseToken,
+              chatId: u.chatId,
+              userId: u.userId,
+              profileName,
+              chatType: String((update.message && update.message.chat && update.message.chat.type) || ""),
+            }, { supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+            if (claim.status === "connected" || claim.status === "already_connected") {
+              await sendMessage(LM_TG_TOKEN, u.chatId,
+                "✅ <b>avocadominiと接続しました。</b>\n\n10個の販売ツールをこのチャットから操作できます。まず /tools で一覧を開いてください。");
+            } else {
+              const messages = {
+                not_paid: "まだStripeの支払い完了を確認できません。購入完了画面から、もう一度接続してください。",
+                expired: "この接続リンクは期限切れです。購入完了画面を開き直してください。",
+                already_claimed: "この購入は別のTelegramアカウントへ接続済みです。",
+              };
+              await sendMessage(LM_TG_TOKEN, u.chatId, messages[claim.status] || "接続を確認できませんでした。購入完了画面からやり直してください。");
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          // Doraemon's public entrypoints must remain reachable even when the legacy Rockstar_ibot
+          // tenant lookup is unavailable. The welcome message is the recovery path for a user who
+          // is visibly stuck in Telegram; the feature handoff below creates/reads its own tenant.
+          if (u.kind === "message" && /^\/buy(?:@[A-Za-z0-9_]+)?$/i.test(u.text || "")) {
+            await sendDoraemonTerms(u.chatId);
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "message" && /^\/(?:paysupport|support)(?:@[A-Za-z0-9_]+)?$/i.test(u.text || "")) {
+            await sendMessage(LM_TG_TOKEN, u.chatId, paysupportReply());
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "message" && /^\/terms(?:@[A-Za-z0-9_]+)?$/i.test(u.text || "")) {
+            await sendDoraemonTerms(u.chatId);
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          const featureStartMatch = u.kind === "message"
+            ? /^\/start(?:@[A-Za-z0-9_]+)?\s+(f2_[0-9a-z]{1,3})$/i.exec(u.text || "")
+            : null;
+          if (featureStartMatch) {
+            const selection = parseFeatureStartPayload(featureStartMatch[1]);
+            const startFreeTier = doraemonFreeTierWriter();
+            const featureStore = doraemonFeatureStore();
+            if (!selection || !startFreeTier || !featureStore) {
+              await sendMessage(LM_TG_TOKEN, u.chatId, "選択内容を安全に保存できないため開始を止めました。時間を置いて、サイトからもう一度お試しください。");
+              res.writeHead(200); res.end("feature selection unavailable");
+              return;
+            }
+            try {
+              const profileName = [u.firstName, u.lastName].filter(Boolean).join(" ");
+              const freeTier = await startFreeTier({
+                chatType: u.chatType,
+                chatId: u.chatId,
+                userId: u.userId,
+                profileName,
+                termsVersion: selection.version,
+              });
+              await featureStore.replace({
+                uid: freeTier.uid,
+                featureKeys: selection.keys,
+                termsVersion: selection.version,
+              });
+              const sent = await sendMessage(
+                LM_TG_TOKEN,
+                u.chatId,
+                mainRoomMessage(selection.keys, { fromWebsite: true }),
+                { reply_markup: mainRoomKeyboard(selection.keys) },
+              );
+              if (!sent || sent.ok !== true) throw new Error("telegram feature selection reply failed");
+              console.log(`[dora-features] website handoff applied selected=${selection.keys.length} tg_message_id=${sent.result && sent.result.message_id || "unknown"}`);
+            } catch (error) {
+              console.error(`[dora-features] website handoff failed: ${error && error.message || "unknown"}`);
+              await sendMessage(LM_TG_TOKEN, u.chatId, "選択内容を保存できなかったため、機能は開始していません。時間を置いて、サイトからもう一度お試しください。");
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "message" && /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+free)?$/i.test(u.text || "")) {
+            let restored = null;
+            try { restored = await doraemonSelectionForChat(u.chatId); }
+            catch (error) { console.error(`[dora-features] selection restore failed: ${error && error.message || "unknown"}`); }
+            if (restored && restored.keys.length) {
+              const sent = await sendMessage(LM_TG_TOKEN, u.chatId,
+                mainRoomMessage(restored.keys), { reply_markup: mainRoomKeyboard(restored.keys) });
+              if (!sent || sent.ok !== true) throw new Error("doraemon restored room send failed");
+            } else {
+              await sendDoraemonFreeNotice(u.chatId);
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          // /codex is intentionally handled before the normal user/onboarding router. This command
+          // is owner-allowlisted and is not allowed to fall through into feedback or browser tasks.
+          if (u.kind === "message" && u.text && /^\/codex(?:@[A-Za-z0-9_]+)?(?:\s|$)/i.test(u.text)) {
+            try {
+              const codex = await handleCodexMessage({
+                text: u.text,
+                chatId: u.chatId,
+                chatType: u.chatType,
+                userId: u.userId,
+                messageId: u.messageId,
+                updateId: update.update_id,
+              }, {
+                enabled: LM_CODEX_ENABLED,
+                allowedChatIds: process.env.LM_CODEX_ALLOWED_CHAT_IDS,
+                telegramToken: LM_TG_TOKEN,
+                supaUrl: SUPA_URL,
+                supaKey: SUPA_KEY,
+              });
+              console.log(`[codex] handled=${codex.handled} accepted=${codex.accepted === true}${codex.jobId ? ` job=${codex.jobId}` : ""}${codex.reason ? ` reason=${codex.reason}` : ""}`);
+            } catch (error) {
+              console.error(`[codex] intake failed: ${error && error.message || "unknown"}`);
+              await sendMessage(LM_TG_TOKEN, u.chatId, "Codexへの指示を保存できませんでした。設定とデータベースを確認してください。");
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          // Keep the public avocadomini command surface independent from the legacy private command set
+          // command router. These five shortcuts always open the same rooms as the inline buttons,
+          // using the latest database selection rather than stale callback state. This runs before
+          // the legacy lm_users lookup so /help still explains recovery when Supabase is unavailable.
+          if (u.kind === "message" && u.text) {
+            const shortcut = await handleDoraemonShortcutCommand(u.text, {
+              token: LM_TG_TOKEN,
+              chatType: u.chatType,
+              chatId: u.chatId,
+              actorId: u.userId,
+            }, {
+              loadSelection: () => doraemonSelectionForChat(u.chatId),
+              runToday: () => sendDoraemonToday(u.chatId),
+              sendMessage,
+            });
+            if (shortcut.handled) {
+              console.log(`[dora-rooms] command action=${shortcut.action} ok=${shortcut.ok === true}${shortcut.reason ? ` reason=${shortcut.reason}` : ""}`);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          const row = await rowByChatId(u.chatId, SUPA_URL, SUPA_KEY); // null until they link via /lm
+          // A reply to a room's ForceReply prompt is a product job, not legacy onboarding or
+          // feedback. Route it before those broad text handlers and persist it idempotently.
+          if (u.kind === "message" && u.text && u.replyToMessageText) {
+            try {
+              const featureRequest = await handleDoraemonFeatureMessage({
+                text: u.text,
+                replyToMessageText: u.replyToMessageText,
+                chatId: u.chatId,
+                chatType: u.chatType,
+                userId: u.userId,
+                messageId: u.messageId,
+                updateId: update.update_id,
+                userRow: row,
+              }, {
+                enabled: LM_CODEX_ENABLED,
+                telegramToken: LM_TG_TOKEN,
+                featureStore: doraemonFeatureStore(),
+                store: (SUPA_URL && SUPA_KEY) ? codexStore() : null,
+                sendMessage,
+              });
+              if (featureRequest.handled) {
+                console.log(`[dora-job] accepted=${featureRequest.accepted === true}${featureRequest.featureKey ? ` feature=${featureRequest.featureKey}` : ""}${featureRequest.jobId ? ` job=${featureRequest.jobId}` : ""}${featureRequest.reason ? ` reason=${featureRequest.reason}` : ""}`);
+                res.writeHead(200); res.end("ok");
+                return;
+              }
+            } catch (error) {
+              console.error(`[dora-job] intake failed: ${error && error.message || "unknown"}`);
+              await sendMessage(LM_TG_TOKEN, u.chatId, "依頼を安全に保存できなかったため、受付していません。時間を置いてやり直してください。");
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          if (u.kind === "message" && /^\/today(?:@[A-Za-z0-9_]+)?$/i.test(u.text || "")) {
+            let selected = [];
+            try { selected = row && row.uid && doraemonFeatureStore() ? await doraemonFeatureStore().get(row.uid) : []; }
+            catch {}
+            if (selected.length) {
+              await sendDoraemonToday(u.chatId);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          // FIN-d (13d-a): a pending wallet-address intake claims the typed message BEFORE feedback
+          // can swallow it — an address must never become a feedback ticket. The module returns
+          // handled:false for everything that is not its intake (no marker, bot commands, other
+          // chats), so feedback, /panel, and the ask-location reply flow below stay untouched.
+          if (u.kind === "message" && u.text) {
+            const intake = await handleTypedPayoutAddress(u.text, row, {
+              token: LM_TG_TOKEN, chatId: u.chatId, actorId: u.userId,
+              supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+            });
+            if (intake.handled) {
+              // Audit names the decision, never the address (it is payout PII-adjacent — log outcomes only).
+              console.log(`[payout] typed intake ok=${intake.ok}${intake.action ? ` action=${intake.action}` : ""}${intake.reason ? ` reason=${intake.reason}` : ""}`);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          const feedback = await handleFeedbackMessage(u, row, {
+            token: LM_TG_TOKEN,
+            provenanceKey: LM_FEEDBACK_PROVENANCE_KEY,
+            supaUrl: SUPA_URL,
+            supaKey: SUPA_KEY,
+            send: sendMessage,
+            ...(LM_FEEDBACK_STORE ? { persist: LM_FEEDBACK_STORE.persist } : {}),
+          });
+          if (feedback.handled) {
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          // Spec §12.1 row 4: the generic slash router. /connect is an ALIAS — it re-enters the same
+          // parsed-control flow as the natural-language "connect calendar" instead of being handled
+          // in the slash branch, so both spellings share one implementation (Gmail stays OFF).
+          const slash = u.kind === "message" ? parseSlashCommand(u.text) : null;
+          const slashAlias = slashAliasText(slash);
+          const parsedControl = parseUserCommand(slashAlias || u.text);
+          // The avocadomini command room accepts ordinary text when this tenant already has one to
+          // three selected tools. Explicit replies, slash commands, wallet intake, feedback, and
+          // legacy Rockstar_ibot controls keep their earlier dedicated routes.
+          if (u.kind === "message" && u.text && !u.replyToMessageText && !slash
+              && parsedControl.kind === "help") {
+            try {
+              const commandRequest = await handleDoraemonCommandMessage({
+                text: u.text,
+                chatId: u.chatId,
+                chatType: u.chatType,
+                userId: u.userId,
+                messageId: u.messageId,
+                updateId: update.update_id,
+                userRow: row,
+              }, {
+                enabled: LM_CODEX_ENABLED,
+                telegramToken: LM_TG_TOKEN,
+                featureStore: doraemonFeatureStore(),
+                store: (SUPA_URL && SUPA_KEY) ? codexStore() : null,
+                sendMessage,
+              });
+              if (commandRequest.handled) {
+                console.log(`[dora-command] accepted=${commandRequest.accepted === true}${commandRequest.jobId ? ` job=${commandRequest.jobId}` : ""}${commandRequest.reason ? ` reason=${commandRequest.reason}` : ""}`);
+                res.writeHead(200); res.end("ok");
+                return;
+              }
+            } catch (error) {
+              console.error(`[dora-command] intake failed: ${error && error.message || "unknown"}`);
+              await sendMessage(LM_TG_TOKEN, u.chatId, "依頼を安全に保存できなかったため、受付していません。時間を置いてやり直してください。");
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          if (isPanelCommand(u.text) || isPanelDeepLink(u.text) || parsedControl.kind === "panel") {
+            const deviceCode = panelDeviceCodeFromCommand(u.text);
+            if (!row) {
+              await sendMessage(LM_TG_TOKEN, u.chatId, "Complete Rockstar_ibot setup with /start before opening your panel.");
+            } else if (!LM_PANEL_BASE) {
+              console.error("[panel] LM_PANEL_BASE_URL/RAILWAY_PUBLIC_DOMAIN not configured");
+              await sendMessage(LM_TG_TOKEN, u.chatId, "The panel is temporarily unavailable. Please try again shortly.");
+            } else if (deviceCode) {
+              const confirmed = await confirmPanelDeviceCode({
+                uid: row.uid, chatId: u.chatId, actorId: u.userId, code: deviceCode,
+              }, { supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+              await sendMessage(LM_TG_TOKEN, u.chatId, confirmed
+                ? "Browser confirmed. Return to the same panel tab."
+                : "That browser code is invalid or no longer available. Reload /panel for a new code.");
+            } else {
+              await sendPanelLink({ uid: row.uid, chatId: u.chatId }, {
+                token: LM_TG_TOKEN,
+                supaUrl: SUPA_URL,
+                supaKey: SUPA_KEY,
+                panelBaseUrl: LM_PANEL_BASE,
+                sendMessage,
+              });
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          // Slash commands other than the /connect alias are handled HERE, before the location /
+          // parsed-control / browser-task / onboarding branches: a /command must never be classified
+          // as a browser task, captured as onboarding text, or answered with a setup nudge. /start
+          // and /panel return handled:false (their existing branches above/below stay the owner),
+          // and an unknown /command gets an honest "unknown command + /help" reply.
+          if (slash && !slashAlias) {
+            const outcome = await handleSlashCommand(slash, row, {
+              token: LM_TG_TOKEN, chatId: u.chatId, base: PUBLIC_BASE,
+              actorId: u.userId,
+              supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+            });
+            if (outcome.handled) {
+              console.log(`[slash] command=${slash.name} action=${outcome.action}${outcome.ok === false ? ` reason=${outcome.reason || "failed"}` : ""}`);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          // A punctuation-prefixed /start lookalike is not a Telegram deep-link payload. Keep it
+          // out of the free-text onboarding path, which would otherwise emit the legacy ?tg= URL.
+          // The slash router already owns alphanumeric unknown commands such as /startfoo.
+          if (u.kind === "message" && u.text && !u.isStart && /^\/start(?:@[A-Za-z0-9_]+)?(?!\s|$)/i.test(u.text)) {
+            await sendMessage(LM_TG_TOKEN, u.chatId, "Unknown command. Send /help to see what I understand.");
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "location") {
+            if (row) {
+              const saved = await upsertLiveLocation(row.uid, u, { supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+              if (!saved) console.error(`[telegram] live location save failed uid=${row.uid.slice(0, 12)}`);
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          const gmailConnectUrl = ""; // Gmail connect is honestly OFF; sendStage auto-skips without rendering OAuth.
+          const opts = {
+            token: LM_TG_TOKEN, base: PUBLIC_BASE, supaUrl: SUPA_URL, supaKey: SUPA_KEY, gmailConnectUrl,
+            composioKey: COMPOSIO_KEY, geminiKey: GEMINI_KEY,
+          };
+          if (u.text && (parsedControl.kind === "command" || parsedControl.kind === "unavailable")) {
+            if (parsedControl.kind === "command" && !row) {
+              await sendMessage(LM_TG_TOKEN, u.chatId, "Complete Rockstar_ibot setup with /start before changing settings.");
+            } else {
+              try {
+                const dispatched = await dispatchParsedControl(parsedControl, {
+                  executeCommand: executeUserCommand,
+                  scope: row ? { uid: row.uid, chatId: u.chatId } : null,
+                  commandDeps: row ? {
+                    store: createSupabaseCommandStore({ supaUrl: SUPA_URL, supaKey: SUPA_KEY }),
+                    idempotencyKey: `telegram:${u.messageId || crypto.randomUUID()}`,
+                    composioKey: COMPOSIO_KEY,
+                    composioAuthConfig: process.env.COMPOSIO_GCAL_AUTH_CONFIG,
+                    panelBaseUrl: LM_PANEL_BASE,
+                    startCalendarConnection: (scope) => composioCalendarStart(scope, { composioKey: COMPOSIO_KEY }),
+                    disconnectCalendar: (scope) => composioCalendarDisconnect(scope, { composioKey: COMPOSIO_KEY }),
+                  } : null,
+                });
+                const result = dispatched.result;
+                if (result && result.state && result.state.redirectUrl) {
+                  await sendMessage(LM_TG_TOKEN, u.chatId, "Calendar needs your Google permission.", { reply_markup: { inline_keyboard: [[{ text: "Connect Calendar", url: result.state.redirectUrl }]] } });
+                } else {
+                  await sendMessage(LM_TG_TOKEN, u.chatId, result ? `✅ ${dispatched.message}` : dispatched.message);
+                }
+              } catch {
+                await sendMessage(LM_TG_TOKEN, u.chatId, "I couldn't apply that change. Your previous setting is unchanged.");
+              }
+            }
+            res.writeHead(200); res.end("ok");
+            return;
+          }
+          if (u.kind === "message" && u.text && process.env.LM_BROWSER_TASKS_ENABLED === "1") {
+            const browserTask = await handleBrowserTaskMessage({
+              text: u.text,
+              chatId: u.chatId,
+              messageId: u.messageId,
+              updateId: update.update_id,
+              user: row,
+            }, {
+              telegramToken: LM_TG_TOKEN,
+              geminiKey: GEMINI_KEY,
+              supaUrl: SUPA_URL,
+              supaKey: SUPA_KEY,
+            });
+            if (browserTask.handled) {
+              console.log(`[browser-task] queued=${browserTask.queued} job=${browserTask.jobId}`);
+              res.writeHead(200); res.end("ok");
+              return;
+            }
+          }
+          if (u.isStart) {
+            // Telegram WebApp initData is the sole identity input for panel onboarding. The URL
+            // builder validates LM_PANEL_BASE and intentionally excludes chat IDs/tokens, so the
+            // web page can create its server session through the existing panel-auth boundary.
+            const reply = startReply(u.chatId, LM_PANEL_BASE);
+            const sent = await sendMessage(LM_TG_TOKEN, u.chatId, reply.text, reply.extra);
+            if (!sent || sent.ok !== true) throw new Error("onboarding web app button send failed");
+          } else if (u.text) {
+            // Native steps (name/phone) capture the typed value; web steps re-nudge; "done" → reply.
+            const result = await handleOnboardingText(u.chatId, u.text, row, opts);
+            if (result === "done") {
+              const res2 = await resolveTelegramReply(u.chatId, u.text);
+              await sendMessage(LM_TG_TOKEN, u.chatId,
+                res2.filled ? `✅ Got it — set “${res2.event}” to ${res2.location}.`
+                            : "Thanks! If that was an event location, reply to my question and I'll add it.");
+            }
+          }
+        }
+      } catch (e) { console.error("[telegram] err", e.message); }
+      res.writeHead(200); res.end("ok"); // always 200 fast so Telegram doesn't retry
+    })();
+    return;
+  }
+  // POST /inbound-email?s=<secret> — Resend Inbound webhook. A web user replied to our "where is X?" email
+  // (To: reply+<token>@<LM_REPLY_DOMAIN>). Auth = the shared secret in the URL; we pull the token out of the
+  // recipient, resolve it to (uid,event) via lm_ask_log, extract the location the user gave, and patch the
+  // calendar + remember it. We never read the user's Gmail — this is OUR inbound domain. Always 200 (so the
+  // provider doesn't retry); a bad/unknown token is a no-op.
+  if (path === "/inbound-email") {
+    if (req.method !== "POST") { res.writeHead(405); res.end("method"); return; }
+    (async () => {
+      try {
+        const q = new URL(req.url, "http://x").searchParams;
+        if (!LM_INBOUND_SECRET || q.get("s") !== LM_INBOUND_SECRET) { res.writeHead(403); res.end("forbidden"); return; }
+        const body = JSON.parse((await readBody(req)) || "{}");
+        const { token, text } = parseInboundRecipient(body); // pure, unit-tested across Resend payload shapes
+        if (!isReplyToken(token)) { res.writeHead(200); res.end("no-token"); return; } // not one of ours → ignore
+        const r = await handleInboundReply(token, text, { composioKey: COMPOSIO_KEY, geminiKey: GEMINI_KEY, supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+        console.log(`[inbound-email] token=${token.slice(0, 8)} ok=${r.ok} ${r.ok ? `${(r.uid || "").slice(0, 12)} → ${r.location}` : r.reason}`);
+        res.writeHead(200); res.end(r.ok ? "patched" : "noop");
+      } catch (e) { console.error("[inbound-email] err", e.message); res.writeHead(200); res.end("err"); }
+    })();
+    return;
+  }
+  // POST/GET /api/inngest — Inngest durable function endpoint (always mounted, independent of LIFE_RUN_LOOPS).
+  // Inngest cloud calls this to register functions and dispatch events. In dev, INNGEST_DEV=1 syncs with
+  // the local Inngest dev server. In prod, INNGEST_SIGNING_KEY authenticates incoming requests.
+  // FAIL-CLOSED: in production (INNGEST_DEV not "1"), if INNGEST_SIGNING_KEY is missing we return 503
+  // rather than serve unauthenticated — matching the fail-closed convention of /telegram and /ws.
+  // In dev (INNGEST_DEV=1) we serve without a signing key so the local dev server can sync.
+  // Both the in-process LIFE_RUN_LOOPS path and the Inngest path coexist; C-H1 (claimWake/claimTravel)
+  // makes concurrent executions race-safe so running both simultaneously is harmless.
+  if (path === "/api/inngest") {
+    if (!inngestServeAllowed(process.env)) {
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "inngest signing key not configured", service: "life-call" }));
+      return;
+    }
+    return inngestHandler(req, res);
+  }
+  // POST /api/stripe/webhook — Stripe billing lifecycle = source of truth for lm_users.paid (HARD-3).
+  // Verify the signature over the RAW body (REQ-35), dedup by event.id (REQ-36), then apply entitlement.
+  // FAIL-CLOSED in prod when STRIPE_WEBHOOK_SECRET is missing (REQ-41).
+  if (path === "/api/stripe/webhook") {
+    if (req.method !== "POST") { res.writeHead(405); res.end("method"); return; }
+    if (!stripeWebhookAllowed(process.env)) {
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "stripe webhook secret not configured", service: "life-call" }));
+      return;
+    }
+    (async () => {
+      const raw = await readRawBody(req); // EXACT bytes (Buffer) for signature verification (FIND-005)
+      let event;
+      try {
+        event = stripe.webhooks.constructEvent(raw, req.headers["stripe-signature"], process.env.STRIPE_WEBHOOK_SECRET || "");
+      } catch (e) {
+        console.error("[stripe] bad signature", e.message);
+        res.writeHead(400); res.end("invalid signature"); return; // REQ-35: reject, no billing side effect
+      }
+      let claimed;
+      try {
+        claimed = await claimEvent(event.id, event.type, SUPA_URL, SUPA_KEY); // REQ-36 idempotency
+      } catch (e) {
+        // A transient database failure is not a duplicate. Returning 500 keeps Stripe redelivery alive.
+        console.error("[stripe] event claim failed", e.message);
+        res.writeHead(500); res.end("event claim failed"); return;
+      }
+      if (!claimed) { res.writeHead(200); res.end("duplicate"); return; }         // duplicate delivery → ack, no re-apply
+      try {
+        const doraemonResult = await applyDoraemonCheckout(event, { supaUrl: SUPA_URL, supaKey: SUPA_KEY });
+        const result = doraemonResult || await applyBilling(event, { supaUrl: SUPA_URL, supaKey: SUPA_KEY, notify: dunningNotify });
+        console.log("[stripe]", event.type, JSON.stringify(result));
+        res.writeHead(200); res.end("ok");
+      } catch (e) {
+        console.error("[stripe] apply failed", e.message);
+        // FIND-006: release the claim so Stripe's redelivery re-processes. If THIS also fails, the event
+        // stays claimed → the transition would stick; log a RECONCILE marker (writes are idempotent SETs).
+        const released = await unclaimEvent(event.id, SUPA_URL, SUPA_KEY);
+        if (!released) console.error("[stripe] RECONCILE: unclaim failed for", event.id, "— manual replay needed");
+        res.writeHead(500); res.end("apply failed");
+      }
+    })();
+    return;
+  }
+
+  res.writeHead(404);
+  res.end("not found");
+});
+
+const wss = new WebSocket.Server({ server, path: "/ws" });
+
+wss.on("connection", (carrierWs, req) => {
+  if (!GEMINI_KEY) {
+    console.error("[bridge] GEMINI_API_KEY missing — closing call");
+    try { carrierWs.close(); } catch {}
+    return;
+  }
+  // Auth gate: reject unsigned/tampered upgrades BEFORE opening a Gemini socket (cost + injection).
+  const ctx = ctxFromReq(req);
+  if (!ctx) {
+    console.error("[bridge] rejected unauthenticated /ws connection");
+    try { carrierWs.close(1008, "unauthorized"); } catch {}
+    return;
+  }
+  if (liveCalls >= MAX_CONCURRENT) {
+    console.error(`[bridge] at capacity (${liveCalls}/${MAX_CONCURRENT}) — rejecting`);
+    try { carrierWs.close(1013, "busy"); } catch {}
+    return;
+  }
+  liveCalls++;
+  const { event, urgency, lang, name, wakeUid, wakeEventKey } = ctx;
+  console.log(`[bridge] carrier connected urgency=${urgency} live=${liveCalls}`);
+  const state = { streamSid: null, inFrames: 0, outFrames: 0, setupComplete: false };
+
+  // C1 (VCSDD rockstar_ibot-cost-connect-reliability): Gemini Live is the DEFAULT — every answered call
+  // is a two-way Charon conversation from the first second (no one-way clip). `liveWsOpened` is the
+  // measurable Goal-1 invariant (now ≥1 on EVERY answered call, the inverse of the old escalation-only
+  // invariant).
+  let gemini = null;
+  let callStartedAtMs = null;
+  let liveWsOpened = 0;
+  let gotAudio = false;       // has Gemini emitted any audio yet on this call?
+  let geminiReconnects = 0;   // one-retry guard for a pre-audio socket drop
+  const carrierSend = (o) => { if (carrierWs.readyState === WebSocket.OPEN) carrierWs.send(JSON.stringify(o)); };
+  const geminiSend = (o) => { if (gemini && gemini.readyState === WebSocket.OPEN) gemini.send(JSON.stringify(o)); };
+
+  // Open the Gemini Live bridge (billed, ~$0.023/min). Called on the Telnyx `start` frame (call
+  // answered) — this IS the default path now, not an escalation. If the socket drops before any audio
+  // was heard, retry ONCE; a second pre-audio failure ends the call cleanly (never silence, never a
+  // clip fallback).
+  function openGeminiLive() {
+    if (gemini) return;
+    liveWsOpened++;
+    console.log(`[bridge] opening Gemini Live live_ws_opened=${liveWsOpened}`);
+    gemini = new WebSocket(geminiLiveWsUrl(GEMINI_KEY));
+    const geminiStartedAtMs = Date.now();
+    let geminiCostRecorded = false;
+    gemini.on("open", () => geminiSend(geminiSetupForEvent(event, urgency, lang, name)));
+    gemini.on("message", (data) => {
+      let msg;
+      try { msg = JSON.parse(data.toString()); } catch { return; }
+      const r = routeGeminiMessage(msg, state, carrierSend, buildTelnyxMediaFrame);
+      if (r.kind === "setupComplete") geminiSend(buildGeminiTurn(openingTurnForLang(lang)));
+      if (r.kind === "audio") gotAudio = true;
+      // Barge-in: the caller spoke over Charon (Gemini server-VAD). Flush Telnyx's queued playback so
+      // the caller is heard immediately instead of talked over.
+      const carrierAction = carrierActionForGeminiKind(r.kind);
+      if (carrierAction) carrierSend(carrierAction); // barge-in: flush Telnyx queued playback
+      if (DEBUG_TRANSCRIPTS) {
+        const t = parseGeminiTranscripts(msg);
+        if (t.input) console.error(`[transcript] USER: ${t.input}`);
+        if (t.output) console.error(`[transcript] CHARON: ${t.output}`);
+      }
+    });
+    // ws fires `error` THEN `close` for a SINGLE failure — the factory's `ended` flag collapses the pair
+    // (else the paired close would hang up the call right after the reconnect socket opened). One retry
+    // only, for a pre-audio transient failure; otherwise end the call cleanly (never silence, never a clip).
+    const onGeminiEnd = makeGeminiEndHandler({
+      getGotAudio: () => gotAudio,
+      getReconnects: () => geminiReconnects,
+      incReconnects: () => { geminiReconnects++; },
+      carrierOpen: () => carrierWs.readyState === WebSocket.OPEN,
+      onReconnect: () => { gemini = null; openGeminiLive(); },
+      onClose: () => { try { carrierWs.close(); } catch {} },
+      log: (reason) => console.log(`[bridge] gemini ${reason} gotAudio=${gotAudio} reconnects=${geminiReconnects}`),
+    });
+    gemini.on("error", (e) => onGeminiEnd(`err ${e.message}`));
+    gemini.on("close", () => {
+      if (!geminiCostRecorded) {
+        geminiCostRecorded = true;
+        const quantity = Math.max(0, (Date.now() - geminiStartedAtMs) / 1000);
+        // Duration proxy from spec §13's measured ~$0.023/min. Google bills Live API by actual
+        // token usage, not wall time (https://ai.google.dev/gemini-api/docs/live-api/best-practices#pricing-billing),
+        // but this bridge does not receive billable token totals, so the ledger stores this explicit estimate.
+        recordCost({ uid: wakeUid || null, kind: "gemini_live", quantity, unit: "seconds",
+          estUsd: quantity / 60 * 0.023, meta: { reconnect: geminiReconnects } });
+      }
+      onGeminiEnd("closed");
+    });
+  }
+
+  carrierWs.on("message", (data) => {
+    let msg;
+    try { msg = JSON.parse(data.toString()); } catch { return; }
+    const kind = routeTelnyxMessage(msg, state, geminiSend);
+    if (kind === "start") {
+      if (callStartedAtMs == null) callStartedAtMs = Date.now();
+      // Recording still begins on media start. answered_at does not: with AMD enabled, only the
+      // signed call.machine.detection.ended human webhook may mark it. LM_AMD=off preserves the old
+      // media-start approximation as an explicit operational fallback.
+      if (wakeUid && wakeEventKey && shouldMarkAnswered({
+        amdEnabled: amdEnabled(process.env), signal: "media-start",
+      })) markAnswered(wakeUid, wakeEventKey, {
+        supaUrl: SUPA_URL, supaKey: SUPA_KEY,
+      }).then((r) => {
+        // Same PATCH as always; only the reporting is new. This return value used to be discarded
+        // entirely, so an LM_AMD=off deployment writing to nothing left no trace (spec §1.3).
+        if (!r.ok) console.error(`[bridge] answered_at PATCH FAILED (${r.error}) wake=${String(wakeUid).slice(0, 12)}`);
+        else if (r.matched === 0) console.error(`[bridge] answered_at matched NO ROW wake=${String(wakeUid).slice(0, 12)}`);
+      }).catch((e) => console.error(`[bridge] answered_at update failed: ${e && e.message}`));
+      if (state.callControlId && !state.recordStarted) {
+        state.recordStarted = true;
+        startRecording(state.callControlId).then((r) => {
+          if (r.ok) console.log(`[bridge] recording started ccid=${state.callControlId}`);
+          else console.error(`[bridge] record_start FAILED: ${r.error}`);
+        });
+      }
+      if (!gemini) openGeminiLive(); // DEFAULT: two-way Gemini Live from second 1
+    }
+    if (kind === "dtmf") console.log("[bridge] DTMF ignored (Gemini Live already open)");
+    if (kind === "stop" && gemini) { try { gemini.close(); } catch {} }
+  });
+  let released = false;
+  const release = () => { if (!released) { released = true; liveCalls = Math.max(0, liveCalls - 1); } };
+  carrierWs.on("close", () => {
+    release();
+    console.log(`[bridge] carrier closed in=${state.inFrames} out=${state.outFrames} live_ws_opened=${liveWsOpened} live=${liveCalls}`);
+    if (callStartedAtMs != null) {
+      const quantity = Math.max(0, (Date.now() - callStartedAtMs) / 1000);
+      recordCost({ uid: wakeUid || null, kind: "telnyx_call", quantity, unit: "seconds",
+        estUsd: quantity / 60 * 0.002, meta: { stream_id: state.streamSid || null } });
+    }
+    if (gemini) { try { gemini.close(); } catch {} }
+  });
+  carrierWs.on("error", release);
+});
+
+// Only bind to the port when this file is run directly (not when required by tests).
+// This allows test files to import inngestServeAllowed without starting the HTTP server.
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`[life-call] listening ${PORT} ws=/ws build=${BUILD_TAG}`);
+    // A comp window silently changes who gets past the paywall and who the scheduler picks up, so it
+    // announces itself once at boot — an operator must never have to guess whether it is on.
+    const compBanner = compBootLog(process.env);
+    if (compBanner) console.log(compBanner);
+    // SINGLE-WRITER (B3): run the scheduler loops in-process ONLY when LIFE_RUN_LOOPS!=="false".
+    // The /ws Telnyx⇄Gemini-Live voice bridge + /test-call + /telegram endpoints are ALWAYS on regardless.
+    // As an OpenClaw voice daemon, set LIFE_RUN_LOOPS=false so the cron-COMMAND jobs (B2) own the loops.
+    const loops = maybeStartLoops(process.env, {
+      startScheduler, startWakeLoop, startReminderLoop, startTravelLoop, startAskLoop, startOnboardLoop, startDiscoveryLoop,
+    });
+    console.log(`[life-call] ${loops.started ? "loops ON (standalone)" : "VOICE DAEMON (loops OFF)"} — ${loops.reason}`);
+    const browserJobs = startBrowserJobLoop({
+      enabled: process.env.LM_BROWSER_TASKS_ENABLED === "1",
+    });
+    console.log(`[life-call] browser jobs ${browserJobs.enabled ? "ON (Railway private Steel)" : "OFF"}`);
+    // INC-3: register our own webhook from our own env — registration and comparison are one value.
+    selfHealWebhook(process.env).then((r) => {
+      // getMe is the source of truth for a token's public identity. Keeping the discovered username
+      // in process memory lets server-rendered surfaces use the right custom bot without persisting
+      // or exposing the token. An explicit mismatching username is rejected by selfHealWebhook.
+      if (r.botUsername && (r.healed || r.reason === "already-registered")) VERIFIED_TG_USERNAME = r.botUsername;
+      console.log(`[life-call] webhook self-heal: healed=${r.healed} ${r.reason}${r.botUsername ? ` bot=@${r.botUsername}` : ""}${r.profileSynced == null ? "" : ` profile=${r.profileSynced ? (r.profileChanged ? "updated" : "current") : "failed"}`}`);
+    }).catch((e) => console.error(`[life-call] webhook self-heal error ${e && e.message}`));
+  });
+}
+
+// redeploy trigger 010026
+
+// Export pure helpers for unit tests (FIND-005).
+module.exports = { inngestServeAllowed, testCallAllowed, TEST_CALL_COOLDOWN_MS, TEST_CALL_DAILY_MAX };

@@ -1,0 +1,78 @@
+name: Hourly README and Git sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hourly-readme-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Update README.md and main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Update the generated README sync block
+        run: node scripts/update-readme-hourly.mjs
+
+      - name: Verify the bounded change
+        id: change
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(git status --porcelain=v1 --untracked-files=all)"
+          if [[ -z "$status" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "README.md was already synchronized for this UTC hour." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ "$status" != " M README.md" ]]; then
+            echo "Unexpected working-tree state:" >&2
+            printf '%s\n' "$status" >&2
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit README.md only
+        if: steps.change.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- README.md
+          git diff --cached --quiet --exit-code -- . ':!README.md'
+          git commit -m "docs: hourly README sync [skip ci]"
+
+      - name: Push without overwriting concurrent work
+        if: steps.change.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          base_revision="$(git rev-parse HEAD^)"
+          remote_revision="$(git rev-parse origin/main)"
+          if [[ "$base_revision" != "$remote_revision" ]]; then
+            echo "origin/main changed during this run; refusing to force-push." >&2
+            exit 1
+          fi
+          git push origin HEAD:main
+          commit_sha="$(git rev-parse HEAD)"
+          echo "README.md commit: $commit_sha" >> "$GITHUB_STEP_SUMMARY"

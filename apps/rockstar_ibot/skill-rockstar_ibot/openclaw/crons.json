@@ -1,0 +1,23 @@
+{
+  "_doc": "Rockstar_ibot OpenClaw cron-COMMAND jobs (B2). COMMAND payloads run the same scheduler.js per-user functions as Railway and Inngest with zero model tokens. LIFE_RUN_LOOPS selects one scheduler owner during cutover. With the canonical Supabase schema configured, WAKE, TRAVEL, and ASK also use the atomic database claims from migrations/2026-06-24-ch1-atomic-dedup.sql as a second overlap fence. The scripts loop all lm_users rows. commandCwd is supplied at registration via LIFE_CALL_DIR. Requires OpenClaw with command-cron support.",
+  "jobs": [
+    {
+      "name": "lm-wake",
+      "cron": "*/1 * * * *",
+      "commandArgv": ["node", "skill-rockstar_ibot/scripts/tick.js"],
+      "description": "Rockstar_ibot wake-call pass (T-15/10/5 escalation across all paid users)"
+    },
+    {
+      "name": "lm-travel",
+      "cron": "*/30 * * * *",
+      "commandArgv": ["node", "skill-rockstar_ibot/scripts/travel.js"],
+      "description": "Rockstar_ibot travel-block auto-fill pass (GO+RETURN [Travel] across all paid users)"
+    },
+    {
+      "name": "lm-ask",
+      "cron": "*/20 * * * *",
+      "commandArgv": ["node", "skill-rockstar_ibot/scripts/ask.js"],
+      "description": "Rockstar_ibot location ask/reply pass (ask via channel, register reply, across all paid users)"
+    }
+  ]
+}

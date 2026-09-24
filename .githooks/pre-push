@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# anicca-oss pre-push hook — eval-loop gate + Cadence Contract guard.
+#
+# Behavior:
+#   For every commit being pushed, find files matching `skills/**/eval-output/*.txt`
+#   that were added or modified relative to the remote tip. Each such file is the
+#   OUTPUT of a generator skill. The expected sidecar is the matching `.input.txt`
+#   in the same directory and the rubric is `skills/<skill>/rubric.json` (or, if
+#   absent, eval-loop's default rubric). Run eval.sh on each pair; if ANY scores
+#   `pass: false`, abort the push.
+#
+# Bypass (emergency only): `git push --no-verify` — do NOT use this without
+# filing an issue per CLAUDE.md HARD RULE #14 (no slop in main).
+#
+# Wave 1 scope: only files under `skills/**/eval-output/*.txt`. Other paths
+# are not gated by this hook (yet).
+#
+# ★ CADENCE CONTRACT GUARD (self-heal.md FIND-001, 2026-07-11, blocking adversary finding on
+# commit 69b48dae) ★ — mechanical, not prose. `cadence-evidence.py`/`cadence.py` implement the
+# exit-criteria that decides whether a loop's cadence is genuinely met (root cause #1: a prior
+# self-fix pass silently lowered this bar by widening "attempted" to count as "achieved" — a
+# Goodhart bug that made a real 4-day stall read as healthy for days). A code comment alone cannot
+# stop a FUTURE self-fix commit from rewriting BOTH the guarded code AND its own regression-lock
+# test in the same commit — that is the exact failure class already proven once. This repo has no
+# PR/CI infra and CLAUDE.md prohibits adding GitHub Actions, so pre-push (this file, the only
+# already-wired local enforcement point, core.hooksPath=.githooks) is where the gate has to live:
+# if the pushed range touches either guarded file, `test_cadence_evidence.py` and `test_cadence.py`
+# (whichever exist) MUST both exit 0 on this machine's own python3, or the push is rejected
+# outright — fail-closed, no partial credit, no bypass other than the existing --no-verify escape
+# hatch (which is itself logged/auditable via git, not a silent path).
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+EVAL_SH="$REPO_ROOT/skills/eval-loop/scripts/eval.sh"
+DEFAULT_RUBRIC="$REPO_ROOT/skills/eval-loop/rubrics/default.rubric.json"
+JQ=/usr/bin/jq
+
+if [ ! -x "$EVAL_SH" ]; then
+  echo "pre-push: eval-loop skill missing at $EVAL_SH — install it before pushing." >&2
+  exit 1
+fi
+
+# Auto-load BYOK env for the judge LLM
+if [ -r /Users/operator/.hermes/.env ]; then
+  set -a; . /Users/operator/.hermes/.env; set +a
+fi
+
+# This hook is a side-effectful production gate (merge → ship). Force
+# EVAL_MODE=production so heuristic fallback ALWAYS fails closed
+# (codex P6 round 2 fix — no good-text escape hatch on backend outage).
+export EVAL_MODE=production
+
+FAILS=0
+TOTAL=0
+CADENCE_GUARD_RAN=0   # run the cadence test gate at most once even if multiple refs are pushed together
+
+# stdin: <local-ref> <local-sha> <remote-ref> <remote-sha>
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  # Skip deleted refs
+  if [ "$LOCAL_SHA" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  # If the remote ref doesn't exist yet, diff against the single pushed commit (best-effort)
+  if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+    RANGE="$LOCAL_SHA"
+    FILES=$(git diff-tree --no-commit-id --name-only --diff-filter=AM -r "$RANGE" -- 'skills/**/eval-output/*.txt' 2>/dev/null || true)
+    CADENCE_TOUCHED=$(git diff-tree --no-commit-id --name-only -r "$RANGE" -- 'skills/self/cadence-evidence.py' 'skills/self/cadence.py' 2>/dev/null || true)
+  else
+    RANGE="$REMOTE_SHA..$LOCAL_SHA"
+    FILES=$(git diff --name-only --diff-filter=AM "$RANGE" -- 'skills/**/eval-output/*.txt' 2>/dev/null || true)
+    CADENCE_TOUCHED=$(git diff --name-only "$RANGE" -- 'skills/self/cadence-evidence.py' 'skills/self/cadence.py' 2>/dev/null || true)
+  fi
+
+  # ★ CADENCE CONTRACT GUARD ★ (see header comment) — runs the REAL test files with THIS machine's
+  # own python3, not a re-derived judgment of what "should" pass. Any non-zero exit aborts the push.
+  if [ -n "$CADENCE_TOUCHED" ] && [ "$CADENCE_GUARD_RAN" -eq 0 ]; then
+    CADENCE_GUARD_RAN=1
+    echo "pre-push: cadence-evidence.py/cadence.py touched in this push — running their regression-lock tests..." >&2
+    for CT in "$REPO_ROOT/skills/self/tests/test_cadence_evidence.py" "$REPO_ROOT/skills/self/tests/test_cadence.py"; do
+      [ -f "$CT" ] || continue
+      CT_OUT="$(mktemp -t prepush_cadence.XXXXXX)"
+      if ! python3 "$CT" > "$CT_OUT" 2>&1; then
+        echo "" >&2
+        echo "pre-push: FAIL — $CT did not exit 0. Aborting push (self-heal.md FIND-001 Cadence Contract guard)." >&2
+        cat "$CT_OUT" >&2
+        rm -f "$CT_OUT"
+        echo "pre-push: this gate exists because a bar-lowering change to the cadence exit-criteria must never" >&2
+        echo "          ship silently (see docs/superpowers/evidence/self-heal.md). Fix the test/code, or in a" >&2
+        echo "          genuine emergency push with --no-verify and file an issue per CLAUDE.md HARD RULE #14." >&2
+        exit 1
+      fi
+      echo "pre-push: OK   — $(basename "$CT")" >&2
+      rm -f "$CT_OUT"
+    done
+  fi
+
+  for f in $FILES; do
+    TOTAL=$((TOTAL + 1))
+    SKILL_DIR_REL="${f#skills/}"
+    SKILL_NAME="${SKILL_DIR_REL%%/*}"
+    SKILL_DIR="$REPO_ROOT/skills/$SKILL_NAME"
+    OUT_FILE="$REPO_ROOT/$f"
+    BASENAME="$(basename "$f" .txt)"
+    IN_FILE="$(dirname "$REPO_ROOT/$f")/$BASENAME.input.txt"
+    RUBRIC="$SKILL_DIR/rubric.json"
+    [ -r "$RUBRIC" ] || RUBRIC="$DEFAULT_RUBRIC"
+
+    if [ ! -r "$IN_FILE" ]; then
+      # Synthesize a minimal input file from the output's title line
+      IN_FILE="$(mktemp -t prepush_in.XXXXXX)"
+      head -n 1 "$OUT_FILE" > "$IN_FILE"
+    fi
+
+    RESULT="$("$EVAL_SH" "$IN_FILE" "$OUT_FILE" "$RUBRIC" 2>/dev/null || echo '{"pass":false,"reason":"eval.sh crashed"}')"
+    if ! echo "$RESULT" | "$JQ" -e '.pass == true' >/dev/null 2>&1; then
+      FAILS=$((FAILS + 1))
+      TOTAL_SCORE=$(echo "$RESULT" | "$JQ" -r '.total // "?"')
+      echo "pre-push: FAIL ($TOTAL_SCORE < 0.7) — $f" >&2
+      echo "          $(echo "$RESULT" | "$JQ" -c '.scores')" >&2
+    else
+      echo "pre-push: OK   ($(echo "$RESULT" | "$JQ" -r '.total')) — $f" >&2
+    fi
+  done
+done
+
+if [ "$TOTAL" -eq 0 ]; then
+  echo "pre-push: 0 eval-output files in push range; skipping." >&2
+  exit 0
+fi
+
+if [ "$FAILS" -gt 0 ]; then
+  echo "" >&2
+  echo "pre-push: $FAILS file(s) failed (< 0.7) — aborting push." >&2
+  echo "         Rework the failing output(s) or, in a genuine emergency, push with --no-verify" >&2
+  echo "         (and file an issue per CLAUDE.md HARD RULE #14)." >&2
+  exit 1
+fi
+
+echo "pre-push: all $TOTAL eval-output files passed (>= 0.7)." >&2
+exit 0

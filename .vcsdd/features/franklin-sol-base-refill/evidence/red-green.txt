@@ -1,0 +1,136 @@
+## RED phase (before lib/refill_plan.py + franklin_sol_base_refill.py existed)
+
+new-feature-tests: FAIL
+regression-baseline: PASS
+
+$ rtk proxy python3 -m pytest tests/test_refill_plan.py tests/test_franklin_sol_base_refill.py -v
+ERROR collecting tests/test_refill_plan.py
+ModuleNotFoundError: No module named 'lib.refill_plan'
+ERROR collecting tests/test_franklin_sol_base_refill.py
+ModuleNotFoundError: No module named 'franklin_sol_base_refill'
+=========================== short test summary info ============================
+ERROR tests/test_refill_plan.py
+ERROR tests/test_franklin_sol_base_refill.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+============================== 2 errors in 0.26s ===============================
+
+$ rtk proxy python3 -m pytest tests/test_caps.py tests/test_identity.py tests/test_ledger.py -v
+============================== 33 passed in 0.18s ===============================
+
+## GREEN phase (after implementation)
+
+target-feature-tests: PASS
+regression-baseline: PASS
+
+$ rtk proxy python3 -m pytest tests/ -v   (skills/earn/funding, all suites incl. new)
+============================== 90 passed in 0.23s ===============================
+(33 pre-existing test_caps.py/test_identity.py/test_ledger.py + 57 new
+ test_refill_plan.py/test_franklin_sol_base_refill.py, zero failures)
+
+$ cd runtime/loop && npm test
+ℹ tests 210
+ℹ suites 0
+ℹ pass 210
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+
+## REQ-007 cron/loop-wiring check
+
+$ grep -rl "franklin_sol_base_refill\|franklin-sol-base-refill" --include="*.json" \
+  --include="*.sh" --include="*.mjs" --include="*.md" . \
+  | grep -v "^\./.vcsdd" | grep -v "^\./skills/earn/funding"
+(no output -- not referenced from any cron/loop/wake wiring)
+
+## impl-review iteration-2 fixes (FIND-002..006, this pass -- FIND-001 intentionally excluded,
+## routed to a follow-up pass that attaches real relay.link dry-run evidence)
+
+target-feature-tests: PASS
+regression-baseline: PASS
+
+$ rtk proxy python3 -m pytest tests/ -v   (skills/earn/funding, all suites incl. new)
+============================== 119 passed in 0.20s ==============================
+(115 pre-fix baseline + 4 new: test_verify_solana_secret_file_decode_failure_reason_never_
+ contains_secret [FIND-002], test_is_killed_raising_treated_as_killed_fails_closed +
+ test_append_ledger_raising_fails_closed_via_stderr_and_nonzero_exit_not_uncaught_crash
+ [FIND-003], test_relay_quote_returns_non_dict_truthy_value_refuses_cleanly [FIND-004];
+ zero failures, zero regressions)
+
+## Tooling note
+
+The `rtk` PostToolUse hook rewrites plain `python3 -m pytest ...` invocations and, in this
+session, repeatedly failed to spawn the process (`os error 2`) for that exact command shape.
+Isolated as a known baseline issue with the rtk command-rewrite wrapper (unrelated to this
+feature's code) -- worked around for the remainder of the session with `rtk proxy <cmd>`,
+which executes the raw command without the rewrite and ran pytest/npm correctly every time.
+
+## gas-ETH mode addition (2026-07-11, --gas-eth/--recipient, REQ-GAS-001..005)
+
+### RED phase (verified by `git stash push --keep-index` on just the 3 implementation files,
+### leaving the new/extended test files in place)
+
+new-feature-tests: FAIL
+regression-baseline: PASS (119 pre-existing tests untouched by the stash)
+
+$ git stash push --keep-index -- franklin_sol_base_refill.py lib/erc20.py lib/refill_plan.py
+$ rtk proxy python3 -m pytest tests/test_franklin_gas_eth_refill.py tests/test_refill_plan.py -q
+ERROR collecting tests/test_franklin_gas_eth_refill.py
+ImportError: cannot import name 'GAS_STEP' from 'franklin_sol_base_refill'
+ERROR collecting tests/test_refill_plan.py
+ImportError: cannot import name 'GAS_FILL_MIN_DELIVERED_PCT' from 'lib.refill_plan'
+2 errors in 0.25s
+$ git stash pop   # implementation restored
+
+### GREEN phase (after run_gas_refill + is_valid_evm_address + evaluate_native_delivery +
+### eth_get_balance implemented)
+
+target-feature-tests: PASS
+regression-baseline: PASS
+
+$ rtk proxy python3 -m pytest tests/ -v   (skills/earn/funding, all suites incl. gas-ETH mode)
+============================== 167 passed in 0.26s ==============================
+(119 pre-existing (USDC mode + lib/caps,identity,ledger,erc20) + 48 new: 24 pure-function tests
+ added to tests/test_refill_plan.py (gas caps reuse, is_valid_evm_address, evaluate_native_delivery;
+ 36 -> 60 test functions in that file) + 24 orchestration tests in the new
+ tests/test_franklin_gas_eth_refill.py; zero failures, zero regressions)
+
+### PROP-012-style network-call check (gas-ETH tests too)
+
+$ grep -rn "requests\.\(get\|post\)\|urllib\.request\.urlopen" tests/
+(no output -- PROP-012 holds for the new test files as well)
+
+### CLI smoke checks (fail-closed, exit non-zero, no crash -- NOT --live, no real money)
+
+$ python3 franklin_sol_base_refill.py --gas-eth
+{"ok": false, "step": "franklin_gas_eth_refill", "error": "recipient is required in gas-ETH
+mode and must be a valid Base EVM address (0x + 40 hex chars) -- there is no default
+destination"}   exit=1
+
+$ env -u ANICCA_HOME python3 franklin_sol_base_refill.py --gas-eth \
+  --recipient 0x1F5b17f41524B02a4ee4d99D4158c86C942e43f3
+{"ok": false, "step": "franklin_gas_eth_refill", "error": "no Solana identity resolved
+(ANICCA_HOME gate failed or resolver returned nothing) -- fail-closed, never falling back to
+another instance"}   exit=1
+
+(Both smoke-check invocations appended a "failed" ledger row to the REAL
+~/anicca/skills/earn/state/funding-ledger.jsonl via build_default_deps(); both rows were removed
+immediately after via a snapshot-diff cleanup -- confirmed the only 2 rows removed matched these
+exact two reasons, leaving the pre-existing 64 rows -- including the prior session's USDC-mode
+live-dryrun evidence -- untouched.)
+
+## relay.link research (search-first, cited before implementing -- persisted here per project
+## rule, not just in chat)
+
+- https://docs.relay.link/references/api/get-quote (the exact `/quote` endpoint this codebase's
+  RELAY_API constant targets) -- own documented example: `originCurrency`/`destinationCurrency`
+  "0x0000000000000000000000000000000000000000" swaps Base ETH (chain 8453) for Optimism ETH
+  (chain 10). Confirms the all-zero address is relay.link's sentinel for a chain's native
+  currency (not USDC-specific).
+- https://docs.relay.link/references/api/get-quote-v2 -- identical request/response shape,
+  confirms `details.currencyIn`/`currencyOut.amount` is the raw base-unit string (wei for native
+  ETH), sibling to `.amountUsd` this feature's existing `_extract_quote_usd` already parses.
+- https://docs.relay.link/features/gas-top-up -- confirms "Gas Top-Up" (`topupGas`) is a
+  DIFFERENT feature (adds native gas alongside a non-native bridged token; explicitly
+  incompatible with bridging TO the native token itself) -- NOT used by this mode, which does a
+  plain USDC-in/native-ETH-out swap via the existing quote/poll/sign/submit flow.

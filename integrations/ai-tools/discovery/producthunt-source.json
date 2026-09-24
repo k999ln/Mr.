@@ -1,0 +1,43 @@
+{
+  "$schema": "./producthunt-source.schema.json",
+  "schemaVersion": 1,
+  "id": "producthunt",
+  "displayName": "Product Hunt",
+  "access": {
+    "mode": "official_graphql_api",
+    "endpoint": "https://api.producthunt.com/v2/api/graphql",
+    "scope": "public",
+    "productionCredentialMode": "client_credentials_via_server_secret_broker",
+    "credentialEnv": "PRODUCT_HUNT_ACCESS_TOKEN",
+    "commercialApprovalEnv": "PRODUCT_HUNT_COMMERCIAL_API_APPROVED"
+  },
+  "commercialUse": {
+    "state": "permission_required",
+    "approvalReference": null,
+    "contact": "hello@producthunt.com",
+    "apiPolicyUrl": "https://api.producthunt.com/v2/docs",
+    "legalTermsUrl": "https://www.producthunt.com/legal"
+  },
+  "policy": {
+    "scrapingAllowed": false,
+    "autoApprovePackages": false,
+    "candidateState": "candidate_only",
+    "candidateRetentionDays": 30,
+    "attributionLabel": "Source: Product Hunt",
+    "attributionUrl": "https://www.producthunt.com"
+  },
+  "search": {
+    "strategy": "topics_then_posts",
+    "defaultQueries": [
+      "Artificial Intelligence",
+      "AI Agents",
+      "Developer Tools",
+      "Productivity"
+    ],
+    "topicLimit": 2,
+    "postsPerTopic": 10,
+    "lookbackDays": 90,
+    "maxCandidates": 30,
+    "minimumRemainingBudget": 100
+  }
+}

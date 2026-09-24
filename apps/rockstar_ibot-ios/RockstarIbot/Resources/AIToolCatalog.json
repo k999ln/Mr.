@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "source": "integrations/ai-tools/registry.json",
+  "executionEnabled": false,
+  "supportedPackageTypes": [
+    "remote-mcp",
+    "npm",
+    "pypi",
+    "cargo",
+    "oci",
+    "nuget",
+    "mcpb"
+  ],
+  "packages": [
+    {
+      "id": "io.rockstar-ibot.examples/remote-ai-tool@0.1.0",
+      "serverName": "io.rockstar-ibot.examples/remote-ai-tool",
+      "title": "Remote AI Tool Template",
+      "description": "Template-only remote MCP tool for package validation",
+      "version": "0.1.0",
+      "kind": "remote_tool",
+      "entryKind": "template",
+      "validationState": "schema_valid",
+      "publisherTrust": "publisher_unverified",
+      "runtimeState": "catalog_only",
+      "registryState": "catalog_only",
+      "signatureState": "not_required_template",
+      "publisherName": "Rockstar_ibot Examples",
+      "packageFormat": "remote-mcp",
+      "manifestSha256": "e429eda5ee491fc3ec50a7005e1a483e860c440f1f75af6bb1ab54a2ae44f74b",
+      "capabilities": [
+        {
+          "id": "summarize.public-text",
+          "title": "Public text summary",
+          "description": "Summarize owner-selected public text without publishing or changing external data.",
+          "effect": "read",
+          "ownerApproval": "install"
+        }
+      ]
+    }
+  ]
+}

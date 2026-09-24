@@ -1,0 +1,63 @@
+flowchart TB
+  subgraph PURPOSE["1 - PURPOSE"]
+    NEED["A person has a verified essential need"]
+    POLICY["Essentials-only support policy"]
+    NOCASH["No cash, crypto, unrestricted gift cards, or bank payout to recipients"]
+    NEED --> POLICY
+    NOCASH --> POLICY
+  end
+
+  subgraph INTAKE["2 - NEEDS INTAKE"]
+    REQUEST["Pseudonymous request or trusted referral"]
+    CONSENT["Recipient consent reference"]
+    CATEGORIES["Food · hygiene · shelter · utilities · healthcare provider · communication · transport"]
+    PRIVATE["Address and sensitive evidence stay in a private vault"]
+    POLICY --> REQUEST
+    REQUEST --> CONSENT
+    REQUEST --> CATEGORIES
+    REQUEST --> PRIVATE
+  end
+
+  subgraph REVIEW["3 - REVIEW AND APPROVAL"]
+    CHECK["Completeness, urgency, duplication, and delivery feasibility checks"]
+    HUMAN["Authorized human or partner makes the eligibility decision"]
+    CAP["Item, quantity, vendor, and procurement cap are approved"]
+    CATEGORIES --> CHECK
+    CONSENT --> CHECK
+    CHECK --> HUMAN
+    HUMAN --> CAP
+  end
+
+  subgraph PROCUREMENT["4 - DIRECT PROVISION"]
+    VENDOR["Verified vendor or licensed service provider"]
+    ORDER["Restricted purchase order paid to the provider"]
+    DELIVERY["Vendor delivery, warehouse parcel, or provider appointment"]
+    CAP --> VENDOR
+    VENDOR --> ORDER
+    ORDER --> DELIVERY
+  end
+
+  subgraph EVIDENCE["5 - RECEIPTS AND FOLLOW-THROUGH"]
+    PURCHASE["Purchase receipt"]
+    DISPATCH["Dispatch or appointment receipt"]
+    RECEIVED["Recipient confirmation or documented exception"]
+    AUDIT["Privacy-minimized, append-only aid ledger"]
+    DELIVERY --> PURCHASE
+    DELIVERY --> DISPATCH
+    DELIVERY --> RECEIVED
+    PURCHASE --> AUDIT
+    DISPATCH --> AUDIT
+    RECEIVED --> AUDIT
+  end
+
+  subgraph FUNDING["6 - INTERNAL PROCUREMENT FUNDING"]
+    REVENUE["Product revenue or restricted contributions"]
+    TREASURY["Kai-owned procurement treasury"]
+    BANK["Purpose-gated bank transfer retained for vendors · business payees · refunds"]
+    REVENUE --> TREASURY
+    TREASURY --> BANK
+    BANK -->|"verified provider payment only"| ORDER
+  end
+
+  STATUS["Target architecture: policy, intake planner, and vendor bank-request gate implemented; live bank credentials, procurement, and delivery providers are not yet connected"]
+  AUDIT --> STATUS

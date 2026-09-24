@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/k999ln/Mr./main/integrations/ai-tools/discovery/producthunt-candidate-queue.schema.json",
+  "schemaVersion": 1,
+  "source": {
+    "id": "producthunt",
+    "displayName": "Product Hunt",
+    "method": "official_graphql_api",
+    "endpoint": "https://api.producthunt.com/v2/api/graphql",
+    "attributionLabel": "Source: Product Hunt",
+    "attributionUrl": "https://www.producthunt.com"
+  },
+  "generatedAt": "2026-08-28T12:00:00.000Z",
+  "expiresAt": "2026-09-27T12:00:00.000Z",
+  "search": {
+    "strategy": "topics_then_posts",
+    "queries": [
+      "AI Agents"
+    ],
+    "matchedTopics": [
+      {
+        "id": "44",
+        "slug": "ai-agents",
+        "name": "AI Agents",
+        "sourceUrl": "https://www.producthunt.com/topics/ai-agents",
+        "matchedQueries": [
+          "AI Agents"
+        ]
+      }
+    ],
+    "postedAfter": "2026-05-30T12:00:00.000Z",
+    "postedBefore": "2026-08-28T12:00:00.000Z"
+  },
+  "intake": {
+    "state": "candidate_only",
+    "autoApprovePackages": false,
+    "installEnabled": false,
+    "executionEnabled": false,
+    "candidateDataTrusted": false,
+    "websiteVisitEnabled": false,
+    "integrityState": "unsigned_operator_observation"
+  },
+  "receipt": {
+    "runId": "producthunt:000000000000000000000000",
+    "querySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "operationSetSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "candidateSetSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "requestCount": 2,
+    "responseBytes": 512,
+    "observedCandidateCount": 1,
+    "retainedCandidateIds": [
+      "producthunt:9001"
+    ],
+    "commercialApprovalReference": "contract:producthunt-schema-fixture",
+    "rateLimit": {
+      "limit": 6250,
+      "remaining": 6200,
+      "reset": 900
+    }
+  },
+  "candidates": [
+    {
+      "candidateId": "producthunt:9001",
+      "sourceProductId": "9001",
+      "name": "Schema Fixture Tool",
+      "tagline": "Synthetic metadata for structural validation only",
+      "sourceUrl": "https://www.producthunt.com/posts/schema-fixture-tool",
+      "websiteUrl": null,
+      "observedLaunchAt": "2026-08-20T10:00:00.000Z",
+      "featuredAt": null,
+      "votesCount": 42,
+      "topics": [
+        {
+          "id": "44",
+          "slug": "ai-agents",
+          "name": "AI Agents"
+        }
+      ],
+      "matchedQueries": [
+        "AI Agents"
+      ],
+      "relevanceScore": 3,
+      "state": "candidate_only",
+      "contentTrust": "untrusted_external_metadata",
+      "nextReview": "publisher_api_mcp_terms_security",
+      "websiteVisitAllowed": false
+    }
+  ]
+}

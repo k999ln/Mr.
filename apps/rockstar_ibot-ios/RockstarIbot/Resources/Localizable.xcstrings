@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "app.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rockstar_ibot" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ライフマネージャー" } }
+      }
+    },
+    "notification.new_message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rockstar_ibot has your next action." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "次にすることを確認できます。" } }
+      }
+    },
+    "notification.open_chat" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open conversation" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "会話を開く" } }
+      }
+    },
+    "account.deletion.receipt" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Your deletion receipt is ready." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "削除の受付結果を確認できます。" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

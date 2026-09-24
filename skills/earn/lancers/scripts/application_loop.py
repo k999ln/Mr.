@@ -1,0 +1,597 @@
+#!/usr/bin/env python3
+"""Run one browserless-planned, at-most-one Lancers application tick."""
+from __future__ import annotations
+
+import argparse, inspect, json, os, re, shutil, sqlite3, subprocess, sys, uuid
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta, timezone
+import importlib.util
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional, Sequence, TextIO
+from zoneinfo import ZoneInfo
+
+HERE = Path(__file__).resolve().parent
+SKILLS_ROOT = HERE.parents[2]
+SKILLS = SKILLS_ROOT
+REPO = SKILLS_ROOT.parent
+STATUS_PATH = HERE / "status.py"
+APPLICATION_TICK_PATH = HERE / "application_tick.py"
+AGENT_RUNNER = REPO / "runtime" / "agent-runner" / "agent_runner.py"
+AGENT_RUNNER_PATH = AGENT_RUNNER
+PLANNER_SCHEMA = SKILLS_ROOT / "gig-work" / "schemas" / "application_decisions.schema.json"
+SCHEMA_PATH = PLANNER_SCHEMA
+PRODUCT_PATH = HERE.parent / "products" / "monthly-sns-content-ops-v1.json"
+PLATFORM = "lancers"
+MAX_OPPORTUNITIES = 20
+DEFAULT_DISCOVERY_QUERY = "SNS運用"
+DISCOVERY_QUERIES = (
+    "SNS運用", "SNS投稿", "コンテンツ制作", "X運用", "Python",
+    "B2Bマーケティング", "AI活用", "システム開発", "ChatGPT", "月額",
+)
+PUBLIC_SOFTWARE_PROOF = {
+    "source_url": "https://github.com/Daisuke134/life-manager", "title": "Rockstar_ibot", "license": "MIT",
+    "description": "API、scheduler、worker、Postgres、object store、Telegram reporting、公式readback付き外部action loopを同一repositoryで実装したMIT公開のpersonal managerです。",
+}
+PLANNER_TASK_CLASS = "application-intent-planner"
+ESCALATION_REASON = "application decision and client-facing proposal text come from this single call"
+PLANNER_TIMEOUT_SECONDS = 420
+DEFAULT_STATE_PATH = Path.home() / ".local/state/anicca/lancers/application.json"
+DEFAULT_EVIDENCE_ROOT = Path.home() / ".local/state/anicca/lancers/planner"
+DEFAULT_EVIDENCE_DIR = DEFAULT_EVIDENCE_ROOT
+DECISION_FIELDS = frozenset({"request_id", "business_class", "reason_codes", "proposal_text", "price_jpy", "deliver_date"})
+BUSINESS_CLASSES = frozenset({"submit_required", "skip_not_fit", "hard_prohibited"})
+HARD_PROHIBITION_CLASSES = {
+    "video_or_animation": "video editing/production, live-action filming, AI video, animation, or MV",
+    "physical_or_onsite": "on-site work or physical making/assembly/cleaning/repair/cooking/sewing/woodwork/model making/packing/shipping/delivery/receipt",
+    "mandatory_human_presence": "human face appearance/performance/voice recording/phone support/mandatory live call or mandatory video interview",
+    "explicit_ai_prohibition": "explicit prohibition on AI use",
+    "illegal_or_unsafe": "illegal or unsafe work",
+    "missing_legal_qualification": "legally required qualification that Kosuke does not hold",
+    "mandatory_attribute_fabrication": "mandatory personal attribute that cannot be answered truthfully without fabrication",
+}
+PUBLIC_FIELDS = ("schema_version", "record_type", "platform", "external_id", "title", "description", "url", "category", "budget_type", "budget_min_minor", "budget_max_minor", "currency", "buyer_external_id", "observed_at")
+DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+ID_RE = re.compile(r"^[0-9]+$")
+KANA_RE = re.compile(r"[ぁ-ゖァ-ヺ]")
+FORBIDDEN_TERMS = ("receipt", "gate", "agent", "model", "browser", "token", "prompt", "internal id", "レシート", "ゲート", "エージェント", "モデル", "ブラウザ", "トークン", "プロンプト", "内部ID")
+FORBIDDEN_RE = re.compile("|".join(re.escape(term).replace(r"\ ", r"[ _]") for term in FORBIDDEN_TERMS), re.IGNORECASE)
+RETAIN_EVIDENCE_ERRORS = frozenset({"planner_runner_failed", "planner_contract_invalid"})
+
+def _load(name: str, path: Path) -> Any:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None: raise RuntimeError("dependency_unavailable")
+    module = importlib.util.module_from_spec(spec); sys.modules[name] = module; spec.loader.exec_module(module)
+    return module
+
+status = _load("_anicca_lancers_application_loop_status", STATUS_PATH)
+application_tick = _load("_anicca_lancers_application_loop_tick", APPLICATION_TICK_PATH)
+
+@dataclass(frozen=True)
+class ApplicationLoopResult:
+    ok: bool
+    submitted: bool = False
+    application_verified: bool = False
+    reason: Optional[str] = None
+    error: Optional[str] = None
+    project_id: Optional[str] = None
+    provider_proposal_id: Optional[str] = None
+    cleanup_error: Optional[str] = None
+    observed_count: Optional[int] = None
+    eligible_count: Optional[int] = None
+    verified_count: Optional[int] = None
+    provider_terminal_blocked_count: Optional[int] = None
+    verified_project_ids: Optional[tuple[str, ...]] = None
+    verified_provider_proposal_ids: Optional[tuple[str, ...]] = None
+    provider_terminal_blocked_project_ids: Optional[tuple[str, ...]] = None
+    unresolved_project_id: Optional[str] = None
+    planner_expected_count: Optional[int] = None
+    planner_returned_count: Optional[int] = None
+
+    def to_dict(self) -> dict[str, object]:
+        result: dict[str, object] = {"ok": bool(self.ok), "platform": PLATFORM, "submitted": bool(self.submitted), "application_verified": bool(self.application_verified)}
+        for key in ("reason", "error", "project_id", "provider_proposal_id", "cleanup_error"):
+            value = getattr(self, key)
+            if value is not None: result[key] = value
+        for key in ("observed_count", "eligible_count", "verified_count", "provider_terminal_blocked_count"):
+            value = getattr(self, key)
+            result[key] = int(value) if isinstance(value, int) and not isinstance(value, bool) else 0
+        for key in ("planner_expected_count", "planner_returned_count"):
+            value = getattr(self, key)
+            if isinstance(value, int) and not isinstance(value, bool): result[key] = value
+        for key in ("verified_project_ids", "verified_provider_proposal_ids", "provider_terminal_blocked_project_ids"):
+            value = getattr(self, key)
+            if value: result[key] = list(value)
+        if self.unresolved_project_id is not None: result["unresolved_project_id"] = self.unresolved_project_id
+        return result
+
+def _tick_date(value: object) -> date:
+    if isinstance(value, datetime):
+        if value.tzinfo is None: raise ValueError
+        return value.astimezone(timezone.utc).date()
+    if isinstance(value, date): return value
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            return parsed.astimezone(timezone.utc).date() if parsed.tzinfo else date.fromisoformat(value.strip())
+        except (TypeError, ValueError, OverflowError): pass
+    raise ValueError
+
+def _discovery_query(value: object) -> str:
+    try:
+        if isinstance(value, datetime):
+            parsed = value
+        elif isinstance(value, str):
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        else:
+            return DEFAULT_DISCOVERY_QUERY
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return DEFAULT_DISCOVERY_QUERY
+        slot = int(parsed.astimezone(timezone.utc).timestamp() // 1800) % len(DISCOVERY_QUERIES)
+        return DISCOVERY_QUERIES[slot]
+    except (TypeError, ValueError, OverflowError, OSError):
+        return DEFAULT_DISCOVERY_QUERY
+
+def _run_default_discovery(tick_value: object, timeout: float, state_path: Path) -> Mapping[str, object]:
+    first = _discovery_query(tick_value)
+    start = DISCOVERY_QUERIES.index(first)
+    last: Mapping[str, object] = {"ok": False, "error": "no_normalized_opportunities", "opportunities": []}
+    for offset in range(len(DISCOVERY_QUERIES)):
+        query = DISCOVERY_QUERIES[(start + offset) % len(DISCOVERY_QUERIES)]
+        last = status.run_discovery(query=query, limit=MAX_OPPORTUNITIES, timeout=timeout)
+        if last.get("ok") is True:
+            opportunities = last.get("opportunities")
+            if isinstance(opportunities, Sequence) and not isinstance(opportunities, (str, bytes, bytearray)):
+                try: remaining, _ = _filter_claimed_rows(opportunities, state_path)
+                except Exception: return last
+                if not remaining: continue
+            return last
+        if last.get("error") != "no_normalized_opportunities":
+            return last
+    return last
+
+def _seller_proof() -> dict[str, object]:
+    product = json.loads(PRODUCT_PATH.read_text(encoding="utf-8")); portfolio = product["portfolio"]; software_portfolio = product["software_portfolio"]; software = PUBLIC_SOFTWARE_PROOF
+    ids = (product["listing_external_id"], portfolio["external_id"], software_portfolio["external_id"])
+    strings = (product["title_stem"], product["description"], product["notice"], portfolio["title_stem"], portfolio["description"], software_portfolio["title_stem"], software_portfolio["description"])
+    if not isinstance(software, Mapping) or set(software) != {"source_url", "title", "description", "license"} or software.get("source_url") != "https://github.com/Daisuke134/life-manager" or any(not isinstance(software.get(key), str) or not software[key].strip() for key in ("title", "description", "license")): raise ValueError
+    if any(not isinstance(value, str) or not value.strip() for value in ids + strings) or any(ID_RE.fullmatch(value) is None for value in ids): raise ValueError
+    plans = [{key: plan[key] for key in ("description", "delivery_days", "price_jpy")} for plan in product["plans"]]
+    return {
+        "profile_url": "https://www.lancers.jp/profile/keiodaisuke",
+        "portfolio_id": ids[1], "portfolio_url": f"https://www.lancers.jp/profile/keiodaisuke/portfolio_popup/{ids[1]}",
+        "portfolio_title": portfolio["title_stem"] + "ました", "portfolio_description": portfolio["description"],
+        "software_portfolio_id": ids[2], "software_portfolio_url": f"https://www.lancers.jp/profile/keiodaisuke/portfolio_popup/{ids[2]}",
+        "software_portfolio_title": software_portfolio["title_stem"] + "ました", "software_portfolio_description": software_portfolio["description"],
+        "package_id": ids[0], "package_url": f"https://www.lancers.jp/menu/detail/{ids[0]}",
+        "package_title": product["title_stem"] + "ます", "package_scope": product["description"], "package_exclusions": product["notice"], "plans": plans,
+        "public_software_proof": dict(software),
+    }
+
+def _snapshot(rows: Sequence[Mapping[str, object]], today: date) -> dict[str, object]:
+    if len(rows) > MAX_OPPORTUNITIES: raise ValueError
+    result, ids = [], set()
+    for row in rows:
+        project_id = row.get("external_id") if isinstance(row, Mapping) else None
+        if not isinstance(project_id, str) or ID_RE.fullmatch(project_id) is None or project_id in ids: raise ValueError
+        ids.add(project_id); compact = {key: row.get(key) for key in PUBLIC_FIELDS}
+        for key, maximum in (("title", 200), ("category", 120), ("description", 2000)):
+            if isinstance(compact[key], str): compact[key] = compact[key][:maximum]
+        result.append(compact)
+    return {"tick_date": today.isoformat(), "seller_proof": _seller_proof(), "opportunities": result}
+
+PLANNER_RULES = ("Lancersの公開案件だけを読むapplication-intent plannerである。ブラウザ・認証・外部操作はできない。"
+    "確認済みのdelivery能力は、非同期のresearch、文章作成・編集・翻訳、digital content設計、code・software・data・AI automation、利用可能なtoolで生成できるdigital artifactである。未提示の個人職歴、雇用経験、資格、電話営業、常駐staff稼働、専用hardwareや外部credentialを能力として仮定しない。"
+    "SNAPSHOTのseller_proofは現在のLancers公開profile、portfolio、packageとMIT公開source codeで買い手が確認できる証拠であり、能力の固定whitelistではない。案件scopeに合う証拠だけを具体的に活用し、未掲載の顧客実績、評価、売上効果、専門職歴を捏造しない。転用可能な確認済み能力で完遂できても公開証拠との距離が大きく買い手にcredible fitを示せない案件はskip_not_fitにする。"
+    "各案件を実際の公開内容全体から自分で判断し、指定schemaのJSONだけを返す。現在の自律delivery systemが全必須成果物を正直に完成でき、買い手にcredible fitを示し、scope・期限・報酬から正のmarginで完遂できる場合だけsubmit_requiredとする。reason_codesは空、買い手向けの具体的な日本語proposalを200〜3000文字、正直な価格、現実的な納期で返す。"
+    "proposalは自己紹介だけで始めず、冒頭で依頼内容の理解と提供価値を案件固有に示す。依頼文の応募質問へ漏れなく直接答え、実行手順・schedule・納品物を明記し、案件に関係する場合だけ修正回数とLancersメッセージでの連絡方法を示す。検証済みでない実績は作らない。"
+    "hard_prohibitedは案件全体が次のいずれかを必須とする場合だけ使う: "
+    + "; ".join(f"{key}={value}" for key, value in HARD_PROHIBITION_CLASSES.items()) + "。"
+    "hard_prohibitedではreason_codes[0]を正確なclass key、reason_codes[1]をtitle・description・categoryのいずれかに連続して存在する200文字以内の原文引用にし、proposal・price・dateはnullにする。任意・推奨・否定・引用中の単語だけで拒否しない。"
+    "reason_codes[1]は公開原文から一文字も足さずcopyし、長い引用に自信がなければ判断根拠を直接示す短い連続原文を使う。"
+    "hard prohibitionではないが、全必須scopeの一部しか対応できない、選定に必須の個人経験・属性を正直に示せない、またはscope・期限・報酬から正のmarginで完遂できない場合はskip_not_fitとする。reason_codes[0]は短いsemantic reason、reason_codes[1]はtitle・description・categoryのいずれかに連続して存在する200文字以内の根拠原文、proposal・price・dateはnullにする。"
+    "案件全体から納品可能性をpriorityより先に確定する。完成動画そのものの生成・編集・書き出しが必須ならvideo_or_animation、企画・構成・台本・文章だけで完成動画制作が不要ならvideo_or_animationではない。機械的なkeyword ruleは使わない。"
+    "経験の不確実さ、弱いportfolio、低予算、難易度、広いまたは曖昧なscope、単発、継続性不足、Adobe実績不明、任意の相談を単独のkeyword ruleでskipしない。正確な同分野実績がなくても、確認済みの転用可能な能力で全必須scopeを完遂できるなら案件固有の実行planで応募し、未作成物はplanと明示して捏造しない。"
+    "納品可能性を確定した後の優先順は、定期購入・保守・運用、次にsystem・automation・AI・web・高報酬、次にその他の非同期作業。hard prohibition必須案件を継続・AI・高報酬・低予算・簡単そうという理由でsubmit_requiredへ変えない。実行可能な低優先案件を省略しない。submit_requiredを先に並べ、強い順に返す。"
+    "既知のbudget_max_minorを超えず、依頼本文にproviderの広い予算帯より狭い具体予算があれば本文の上限を優先する。budgetが応相談・未定でも拒否しない。一律の最低価格や固定上限を設けない。scopeと正のmarginを守りながら競合より少し安い価格と、実行可能な最短納期を選ぶ。"
+    "live call・video meeting・顔出し・音声収録を自発的に約束せず、任意ならLancersメッセージと文書による非同期確認を提案する。必須ならhard_prohibitedにする。"
+    "提案文には次の語を含めない: " + ", ".join(FORBIDDEN_TERMS) + "。送信・受注・納品・支払済みと主張しない。\nSNAPSHOT:\n")
+
+def build_planner_prompt(rows: Sequence[Mapping[str, object]], today: date) -> str:
+    return PLANNER_RULES + json.dumps(_snapshot(rows, _tick_date(today)), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+def _invoke_agent(prompt: str, evidence_dir: Path, task_class: str, schema_path: Path, label: str) -> Mapping[str, object]:
+    command = [sys.executable, str(AGENT_RUNNER), "--task-class", task_class, "--prompt-stdin", "--schema", str(schema_path), "--evidence-dir", str(evidence_dir), "--task-label", label, "--loop", "lancers-application", "--workdir", str(SKILLS_ROOT.parent), "--escalation-reason", ESCALATION_REASON]
+    try:
+        # stderr is kept, not discarded. The runner refuses on configuration this loop cannot see,
+        # and a refusal that reaches no log is a lane that stops applying without ever saying so.
+        completed = subprocess.run(command, input=prompt, text=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False, timeout=PLANNER_TIMEOUT_SECONDS + 30)
+        if completed.returncode != 0: raise ValueError(((completed.stderr or "").strip().splitlines() or ["no stderr"])[-1])
+        evidence = Path(evidence_dir); summary = json.loads((evidence / "summary.json").read_text(encoding="utf-8"))
+        result_path = Path(str(summary["result_path"])).resolve(); result_path.relative_to(evidence.resolve())
+        if summary.get("status") != "success": raise ValueError
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        if not isinstance(result, Mapping): raise ValueError
+        return result
+    except Exception as error: raise RuntimeError(f"agent_runner_failed: {error}") from None
+
+def _planner_runtime_schema(prompt: str, evidence_dir: Path) -> Path:
+    snapshot = json.loads(prompt.rsplit("SNAPSHOT:\n", 1)[1])
+    ids = [row["external_id"] for row in snapshot["opportunities"]]
+    schema = json.loads(PLANNER_SCHEMA.read_text(encoding="utf-8"))
+    decisions = schema["properties"]["decisions"]
+    decisions["minItems"] = 1
+    decisions["maxItems"] = len(ids)
+    decisions["items"]["properties"]["request_id"]["enum"] = ids
+    decisions["items"]["properties"]["business_class"]["enum"] = sorted(BUSINESS_CLASSES)
+    path = Path(evidence_dir) / "planner-runtime.schema.json"
+    path.write_text(json.dumps(schema, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    os.chmod(path, 0o600)
+    return path
+
+def invoke_planner(prompt: str, evidence_dir: Path) -> Mapping[str, object]:
+    return _invoke_agent(prompt, evidence_dir, PLANNER_TASK_CLASS, _planner_runtime_schema(prompt, evidence_dir), "lancers-application-intent")
+
+def _default_planner(prompt: str, evidence: Path) -> Mapping[str, object]:
+    return invoke_planner(prompt, evidence)
+
+def _safe_proposal(value: object, ids: Sequence[str]) -> bool:
+    if not isinstance(value, str) or not 200 <= len(value) <= 3000: return False
+    if len(KANA_RE.findall(value)) < max(20, len(re.findall(r"[A-Za-z]", value)) + 1): return False
+    if FORBIDDEN_RE.search(value): return False
+    return not any(re.search(rf"(?<![0-9]){re.escape(project_id)}(?![0-9])", value) for project_id in ids)
+
+def _valid_date(value: object, today: date) -> bool:
+    if not isinstance(value, str) or DATE_RE.fullmatch(value) is None: return False
+    try: parsed = date.fromisoformat(value)
+    except (TypeError, ValueError, OverflowError): return False
+    return value == parsed.isoformat() and today + timedelta(days=1) <= parsed <= today + timedelta(days=60)
+
+def _valid_observed_budget(row: object) -> bool:
+    if not isinstance(row, Mapping): return False
+    minimum, maximum = row.get("budget_min_minor"), row.get("budget_max_minor")
+    return not any(value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0) for value in (minimum, maximum)) and not (minimum is not None and maximum is not None and minimum > maximum)
+
+def _public_excerpt(excerpt: str, public_text: str) -> bool:
+    return " ".join(excerpt.split()) in " ".join(public_text.split())
+
+def _validate(rows: Sequence[Mapping[str, object]], value: object, today: date) -> dict[str, Mapping[str, object]]:
+    try:
+        if not isinstance(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")), Mapping) or not isinstance(value, Mapping): raise ValueError
+        decisions = value.get("decisions")
+        if set(value) != {"decisions"} or not isinstance(decisions, list) or not decisions or len(decisions) > len(rows): raise ValueError
+        expected = [str(row["external_id"]) for row in rows]; rows_by_id = {str(row["external_id"]): row for row in rows}; found: dict[str, Mapping[str, object]] = {}
+        for decision in decisions:
+            if not isinstance(decision, Mapping) or set(decision) != DECISION_FIELDS: raise ValueError
+            project_id, business_class, reasons = decision.get("request_id"), decision.get("business_class"), decision.get("reason_codes")
+            if not isinstance(project_id, str) or project_id not in expected or project_id in found or business_class not in BUSINESS_CLASSES or not isinstance(reasons, list) or any(not isinstance(reason, str) or not reason.strip() for reason in reasons) or len(set(reasons)) != len(reasons): raise ValueError
+            proposal, price, due = decision.get("proposal_text"), decision.get("price_jpy"), decision.get("deliver_date")
+            if business_class == "hard_prohibited":
+                if proposal is not None or price is not None or due is not None or len(reasons) < 2 or reasons[0] not in HARD_PROHIBITION_CLASSES: raise ValueError
+                public_row = rows_by_id[project_id]
+                public_text = "\n".join(str(public_row.get(key) or "") for key in ("title", "description", "category"))
+                if not 1 <= len(reasons[1]) <= 200 or not _public_excerpt(reasons[1], public_text): raise ValueError
+            elif business_class == "skip_not_fit":
+                if proposal is not None or price is not None or due is not None or len(reasons) < 2: raise ValueError
+                public_row = rows_by_id[project_id]
+                public_text = "\n".join(str(public_row.get(key) or "") for key in ("title", "description", "category"))
+                if not 1 <= len(reasons[0]) <= 120 or not 1 <= len(reasons[1]) <= 200 or not _public_excerpt(reasons[1], public_text): raise ValueError
+            elif reasons or not _safe_proposal(proposal, expected) or isinstance(price, bool) or not isinstance(price, int) or price < 1 or not _valid_date(due, today): raise ValueError
+            found[project_id] = decision
+        for row in rows:
+            if not _valid_observed_budget(row): raise ValueError
+        for project_id, decision in found.items():
+            row, price = rows_by_id[project_id], decision.get("price_jpy")
+            maximum = row.get("budget_max_minor")
+            if decision["business_class"] == "submit_required" and (row.get("currency") != "JPY" or (maximum is not None and price > maximum)): raise ValueError
+        return found
+    except Exception: raise ValueError from None
+
+def validate_decisions(rows: Sequence[Mapping[str, object]], value: object, today: date) -> list[str]:
+    try: _validate(rows, value, _tick_date(today))
+    except Exception: return ["planner_failed"]
+    return []
+
+def _reset(path: Path) -> None:
+    if path.is_symlink() or path.is_file(): path.unlink()
+    elif path.is_dir(): shutil.rmtree(path)
+    path.mkdir(parents=True, mode=0o700, exist_ok=False); os.chmod(path, 0o700)
+
+def _tick_result(value: object, project_id: str) -> ApplicationLoopResult:
+    raw = value.to_dict() if callable(getattr(value, "to_dict", None)) else value
+    if not isinstance(raw, Mapping): return ApplicationLoopResult(False, error="submission_uncertain", project_id=project_id)
+    clean = lambda item: item if isinstance(item, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", item) else None
+    found = raw.get("project_id") if isinstance(raw.get("project_id"), str) and ID_RE.fullmatch(raw["project_id"]) else project_id
+    reason, error = clean(raw.get("reason")), clean(raw.get("error"))
+    submitted, raw_verified = raw.get("submitted") is True, raw.get("application_verified") is True
+    provider_verified = raw_verified or reason in {"duplicate_project", "provider_reconciled"}
+    provider_blocked = reason == "provider_terminal_blocked"
+    raw_error = raw.get("error")
+    raw_ok = raw.get("ok") if isinstance(raw.get("ok"), bool) else None
+    provider_id = clean(raw.get("provider_proposal_id"))
+    invalid = raw_error is not None or (raw_ok is False and not provider_blocked) or not (provider_verified or provider_blocked)
+    if invalid:
+        return ApplicationLoopResult(False, submitted, False, reason, error or "submission_uncertain", found, provider_id)
+    return ApplicationLoopResult(raw_ok is not False, submitted, raw_verified, reason, None, found, provider_id)
+
+def _emit(result: ApplicationLoopResult, stream: TextIO) -> None:
+    stream.write(json.dumps(result.to_dict(), ensure_ascii=False, separators=(",", ":")) + "\n"); stream.flush()
+
+def _pending_submitter_override(*_args: object, **_kwargs: object) -> Mapping[str, object]:
+    raise RuntimeError("pending_reconciliation_submitter_disabled")
+
+def _reconcile_pending(descriptor: Mapping[str, object], state_path: Path) -> ApplicationLoopResult:
+    project_id = descriptor.get("project_id")
+    if not isinstance(project_id, str) or not project_id:
+        return ApplicationLoopResult(False, error="state_invalid")
+    try:
+        value = application_tick.run_live_tick(
+            project_id=project_id,
+            proposal_text="pending reconciliation",
+            proposed_amount_minor=descriptor["amount_minor"],
+            delivery_due_on=descriptor["delivery_due_on"],
+            state_path=Path(state_path),
+            submitter_override=_pending_submitter_override,
+        )
+    except Exception:
+        return ApplicationLoopResult(False, error="submission_uncertain", project_id=project_id)
+    result = _tick_result(value, project_id)
+    verified = (result,) if _provider_verified(result) else ()
+    blocked = (project_id,) if _provider_terminal_blocked(result) else ()
+    return _batch_summary(result, 1, 1, verified, blocked, unresolved_project_id=None if verified or blocked else project_id, submitted=result.submitted)
+
+def run_reconcile_only(state_path: Path, output_stream: Optional[TextIO] = None) -> dict[str, object]:
+    try:
+        descriptors = application_tick.shared.read_pending_descriptors(Path(state_path))
+    except Exception:
+        result = {
+            "ok": False,
+            "platform": PLATFORM,
+            "submitted": False,
+            "application_verified": False,
+            "reconciled_project_ids": [],
+            "verified_project_ids": [],
+            "unresolved_project_ids": [],
+            "error": "state_invalid",
+        }
+        if output_stream is not None:
+            output_stream.write(json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n")
+            output_stream.flush()
+        return result
+
+    reconciled_project_ids = []
+    verified_project_ids = []
+    unresolved_project_ids = []
+    for descriptor in descriptors:
+        project_id = descriptor["project_id"]
+        reconciled_project_ids.append(project_id)
+        result = _reconcile_pending(descriptor, Path(state_path))
+        if _provider_verified(result):
+            verified_project_ids.append(project_id)
+        else:
+            unresolved_project_ids.append(project_id)
+    summary = {
+        "ok": not unresolved_project_ids,
+        "platform": PLATFORM,
+        "submitted": False,
+        "application_verified": bool(verified_project_ids),
+        "reconciled_project_ids": reconciled_project_ids,
+        "verified_project_ids": verified_project_ids,
+        "unresolved_project_ids": unresolved_project_ids,
+    }
+    if output_stream is not None:
+        output_stream.write(json.dumps(summary, ensure_ascii=False, separators=(",", ":")) + "\n")
+        output_stream.flush()
+    return summary
+
+def _submit(fn: Callable[..., object], row: Mapping[str, object], proposal: str, amount: int, due: str, state_path: Path) -> object:
+    values = {"project_id": str(row["external_id"]), "proposal_text": proposal, "proposed_amount_minor": amount, "delivery_due_on": due, "state_path": state_path}
+    try:
+        parameters = inspect.signature(fn).parameters
+        keyword = any(parameter.kind == parameter.VAR_KEYWORD for parameter in parameters.values()) or {"project_id", "proposal_text", "proposed_amount_minor", "delivery_due_on"}.issubset(parameters)
+    except (TypeError, ValueError): keyword = False
+    return fn(**values) if keyword else fn(row, proposal, amount, due)
+
+def _filter_claimed_rows(rows: Sequence[Mapping[str, object]], state_path: Path) -> tuple[list[Mapping[str, object]], Optional[str]]:
+    if any(not _valid_observed_budget(row) for row in rows): raise ValueError
+    ids = [row.get("external_id") if isinstance(row, Mapping) else None for row in rows]
+    duplicate_ids = {project_id for project_id in ids if isinstance(project_id, str) and ids.count(project_id) > 1}
+    remaining, first_claimed = [], None
+    for row, project_id in zip(rows, ids):
+        if not isinstance(project_id, str) or ID_RE.fullmatch(project_id) is None or project_id in duplicate_ids or not application_tick.state_has_claim(Path(state_path), project_id):
+            remaining.append(row)
+        elif first_claimed is None:
+            first_claimed = project_id
+    return remaining, first_claimed
+
+def _claim_no_effect(decisions: Mapping[str, Mapping[str, object]], state_path: Path) -> None:
+    project_ids = [project_id for project_id, decision in decisions.items() if decision.get("business_class") in {"hard_prohibited", "skip_not_fit"}]
+    if not project_ids:
+        return
+    if any(ID_RE.fullmatch(project_id) is None for project_id in project_ids):
+        raise ValueError
+    with application_tick.account_lock(Path(state_path)):
+        claims, pending = application_tick.shared._read_state(Path(state_path))
+        claims.update(application_tick._application_marker(project_id) for project_id in project_ids)
+        application_tick.shared._write_state(Path(state_path), claims, pending)
+
+def _capacity_reason(state_path: Path, tick_value: object) -> Optional[str]:
+    try:
+        now = tick_value if isinstance(tick_value, datetime) else datetime.fromisoformat(str(tick_value).replace("Z", "+00:00"))
+        if now.tzinfo is None or now.utcoffset() is None: raise ValueError
+        snapshot = json.loads(Path(state_path).with_name("contracts.json").read_text(encoding="utf-8"))
+        observed = datetime.fromisoformat(str(snapshot["observed_at"]).replace("Z", "+00:00"))
+        keys = ("project_working_count", "monthly_contract_count", "storefront_contract_candidate_count")
+        counts = [snapshot[key] for key in keys]
+        if snapshot.get("source_complete") is not True or observed.tzinfo is None or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts) or snapshot.get("contract_candidate_count") != sum(counts): raise ValueError
+        age = now.astimezone(timezone.utc) - observed.astimezone(timezone.utc)
+        if age < timedelta(minutes=-1) or age > timedelta(minutes=15): raise ValueError
+        if sum(counts): return "capacity_details_required"
+        database = Path(state_path).with_name("marketplace-ledger.sqlite3")
+        connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
+        try: rows = connection.execute("SELECT occurred_at FROM marketplace_events WHERE platform=? AND event_type=?", (PLATFORM, "application_verified")).fetchall()
+        finally: connection.close()
+        japan = ZoneInfo("Asia/Tokyo"); japan_day = now.astimezone(japan).date()
+        used = sum(datetime.fromisoformat(str(row[0]).replace("Z", "+00:00")).astimezone(japan).date() == japan_day for row in rows)
+        return "daily_quota_reached" if used >= 10 else None
+    except Exception:
+        return "capacity_source_unavailable"
+
+def _provider_verified(result: ApplicationLoopResult) -> bool:
+    return result.error is None and result.ok and (result.application_verified or result.reason in {"duplicate_project", "provider_reconciled"})
+
+def _provider_terminal_blocked(result: ApplicationLoopResult) -> bool:
+    return result.error == "provider_terminal_blocked" or (result.error is None and result.reason == "provider_terminal_blocked")
+
+def _batch_summary(
+    result: ApplicationLoopResult, observed_count: int, eligible_count: int,
+    verified: Sequence[ApplicationLoopResult], blocked: Sequence[str],
+    *, unresolved_project_id: Optional[str] = None, ok: Optional[bool] = None,
+    submitted: Optional[bool] = None,
+) -> ApplicationLoopResult:
+    verified_projects = tuple(item.project_id for item in verified if item.project_id is not None)
+    verified_proposals = tuple(item.provider_proposal_id for item in verified if item.provider_proposal_id is not None)
+    success = result.ok if ok is None else ok
+    return replace(result, ok=success, submitted=any(item.submitted for item in verified) if submitted is None else submitted, observed_count=observed_count, eligible_count=eligible_count, verified_count=len(verified), provider_terminal_blocked_count=len(blocked), verified_project_ids=verified_projects, verified_provider_proposal_ids=verified_proposals, provider_terminal_blocked_project_ids=tuple(blocked), unresolved_project_id=unresolved_project_id)
+
+def _rank_eligible_by_buyer_quality(eligible: Sequence[tuple[Mapping[str, object], Mapping[str, object]]]) -> list[tuple[Mapping[str, object], Mapping[str, object]]]:
+    ranked = []
+    for index, item in enumerate(eligible):
+        row, decision = item
+        try: rate = status.fetch_public_client_order_rate(row.get("buyer_external_id"))
+        except Exception: rate = None
+        maximum = row.get("budget_max_minor")
+        budget = maximum if isinstance(maximum, int) and not isinstance(maximum, bool) else int(decision["price_jpy"])
+        proposal_match = re.search(r"(?:^|\n)提案数: ([0-9][0-9,]*)件(?:\n|$)", str(row.get("description") or ""))
+        applicants = int(proposal_match.group(1).replace(",", "")) if proposal_match else float("inf")
+        ranked.append(((0 if budget >= 50000 else 1, -budget, 0 if isinstance(rate, int) else 1, -(rate or 0), applicants, index), item))
+    return [item for _key, item in sorted(ranked, key=lambda value: value[0])]
+
+def _plan_and_submit(rows: Sequence[Mapping[str, object]], today: date, evidence: Path, planner: Optional[Callable[..., object]], safety_verifier: Optional[Callable[..., object]], submitter: Optional[Callable[..., object]], state_path: Path) -> ApplicationLoopResult:
+    observed_count = len(rows)
+    try:
+        rows, claimed_project_id = _filter_claimed_rows(rows, state_path)
+        if not rows:
+            return _batch_summary(ApplicationLoopResult(True, reason="duplicate_project", project_id=claimed_project_id), observed_count, 0, (), ())
+        prompt = build_planner_prompt(rows, today)
+    except Exception: return _batch_summary(ApplicationLoopResult(False, error="planner_contract_invalid"), observed_count, 0, (), ())
+    try: planned = (planner or _default_planner)(prompt, evidence)
+    except Exception: return _batch_summary(ApplicationLoopResult(False, error="planner_runner_failed", planner_expected_count=len(rows)), observed_count, 0, (), ())
+    returned = len(planned.get("decisions")) if isinstance(planned, Mapping) and isinstance(planned.get("decisions"), list) else None
+    try:
+        items = planned.get("decisions") if isinstance(planned, Mapping) and set(planned) == {"decisions"} else None
+        request_ids = [item.get("request_id") if isinstance(item, Mapping) else None for item in items] if isinstance(items, list) else []
+        if not items or len(request_ids) != len(set(request_ids)): raise ValueError
+        decisions = {}
+        for item in items:
+            try: decisions.update(_validate(rows, {"decisions": [item]}, today))
+            except Exception: continue
+        if not decisions: raise ValueError
+    except Exception: return _batch_summary(ApplicationLoopResult(False, error="planner_contract_invalid", planner_expected_count=len(rows), planner_returned_count=returned), observed_count, 0, (), ())
+    try: _claim_no_effect(decisions, state_path)
+    except Exception: return _batch_summary(ApplicationLoopResult(False, error="state_invalid"), observed_count, 0, (), ())
+    rows_by_id = {str(row["external_id"]): row for row in rows}
+    eligible = [(rows_by_id[project_id], decision) for project_id, decision in decisions.items() if decision.get("business_class") == "submit_required"]
+    if not eligible:
+        return _batch_summary(ApplicationLoopResult(True, reason="no_eligible_project"), observed_count, 0, (), ())
+    if submitter is None and len(eligible) > 1:
+        eligible = _rank_eligible_by_buyer_quality(eligible)
+    verified, blocked = [], []
+    for row, decision in eligible[:1]:
+        project_id, proposal = str(row["external_id"]), str(decision["proposal_text"])
+        amount, due = int(decision["price_jpy"]), str(decision["deliver_date"])
+        try:
+            value = application_tick.run_live_tick(project_id=project_id, proposal_text=proposal, proposed_amount_minor=amount, delivery_due_on=due, state_path=state_path) if submitter is None else _submit(submitter, row, proposal, amount, due, state_path)
+            current = _tick_result(value, project_id)
+        except Exception:
+            current = ApplicationLoopResult(False, error="submission_uncertain", project_id=project_id)
+        if _provider_verified(current):
+            verified.append(current)
+            continue
+        if _provider_terminal_blocked(current):
+            blocked.append(project_id)
+            continue
+        return _batch_summary(current, observed_count, len(eligible), verified, blocked, unresolved_project_id=project_id, submitted=any(item.submitted for item in verified))
+    final = verified[-1] if verified else ApplicationLoopResult(True, reason="provider_terminal_blocked", project_id=blocked[-1] if blocked else None)
+    return _batch_summary(final, observed_count, len(eligible), verified, blocked, ok=True, submitted=any(item.submitted for item in verified))
+
+def run_loop(*, state_path: Path = DEFAULT_STATE_PATH, evidence_root: Optional[Path] = None, discoverer: Optional[Callable[..., Mapping[str, object]]] = None, planner: Optional[Callable[..., object]] = None, safety_verifier: Optional[Callable[..., object]] = None, submitter: Optional[Callable[..., object]] = None, clock: Optional[Callable[[], object]] = None, discovery: Optional[Callable[..., Mapping[str, object]]] = None, now: Optional[Callable[[], object]] = None, evidence_dir: Optional[Path] = None, output_stream: Optional[TextIO] = None, query: Optional[str] = None, timeout: float = 20.0) -> dict[str, object]:
+    try:
+        pending = application_tick.read_pending_descriptor(Path(state_path))
+    except Exception:
+        result = ApplicationLoopResult(False, error="state_invalid")
+        if output_stream is not None: _emit(result, output_stream)
+        return result.to_dict()
+    quarantined_project_id = None
+    if pending is not None:
+        pending_result = _reconcile_pending(pending, Path(state_path))
+        if pending_result.error != "submission_uncertain":
+            if output_stream is not None: _emit(pending_result, output_stream)
+            return pending_result.to_dict()
+        quarantined_project_id = pending_result.unresolved_project_id or pending_result.project_id
+    try: tick_value = (clock or now or (lambda: datetime.now(timezone.utc)))()
+    except Exception: tick_value = None
+    capacity_reason = _capacity_reason(Path(state_path), tick_value) if submitter is None and discoverer is None and discovery is None and query is None else None
+    if capacity_reason is not None:
+        result = ApplicationLoopResult(True, reason=capacity_reason, unresolved_project_id=quarantined_project_id)
+        if output_stream is not None: _emit(result, output_stream)
+        return result.to_dict()
+    root = Path(evidence_root if evidence_root is not None else evidence_dir or DEFAULT_EVIDENCE_ROOT); result = ApplicationLoopResult(False, error="planner_runner_failed"); cleanup_failed = False; evidence: Optional[Path] = None
+    try:
+        try:
+            _reset(root); evidence = root / f"run-{uuid.uuid4().hex}"; evidence.mkdir(mode=0o700, exist_ok=False); os.chmod(evidence, 0o700)
+        except Exception: evidence = None
+        if evidence is not None:
+            source = discoverer or discovery
+            turns = 3 if source is None and query is None else 1
+            observed_total = 0
+            for turn in range(turns):
+                turn_evidence = evidence
+                if turns > 1:
+                    turn_evidence = evidence / f"turn-{turn + 1}"
+                    turn_evidence.mkdir(mode=0o700, exist_ok=False)
+                try:
+                    observed = source(query=query if query is not None else _discovery_query(tick_value), limit=MAX_OPPORTUNITIES, timeout=timeout) if source is not None or query is not None else _run_default_discovery(tick_value, timeout, Path(state_path))
+                except Exception: observed = None
+                if observed is None or not isinstance(observed, Mapping): result = ApplicationLoopResult(False, error="discovery_failed")
+                else:
+                    error, opportunities = observed.get("error"), observed.get("opportunities", [])
+                    if observed.get("ok") is not True and not (error == "no_normalized_opportunities" and "opportunities" in observed and not opportunities):
+                        clean_error = error if isinstance(error, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", error or "") else "discovery_failed"
+                        result = ApplicationLoopResult(False, error=clean_error)
+                    elif error is not None and error != "no_normalized_opportunities":
+                        result = ApplicationLoopResult(False, error=error if isinstance(error, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", error) else "discovery_failed")
+                    elif isinstance(opportunities, (str, bytes, bytearray)) or not isinstance(opportunities, Sequence): result = ApplicationLoopResult(False, error="discovery_failed")
+                    elif not opportunities: result = ApplicationLoopResult(True, reason="no_eligible_project")
+                    else:
+                        try: today = _tick_date(tick_value)
+                        except Exception: result = ApplicationLoopResult(False, error="planner_contract_invalid")
+                        else: result = _plan_and_submit(opportunities, today, turn_evidence, planner, safety_verifier, submitter, Path(state_path))
+                observed_total += result.observed_count or 0
+                result = replace(result, observed_count=observed_total)
+                if result.reason != "no_eligible_project":
+                    break
+    finally:
+        if result.error not in RETAIN_EVIDENCE_ERRORS:
+            try:
+                if root.is_symlink() or root.is_file(): root.unlink()
+                elif root.is_dir(): shutil.rmtree(root)
+            except OSError: cleanup_failed = True
+    if cleanup_failed:
+        result = replace(result, ok=False, error=result.error or "evidence_cleanup_failed", cleanup_error="evidence_cleanup_failed" if result.error else None)
+    if quarantined_project_id is not None and result.unresolved_project_id is None:
+        result = replace(result, unresolved_project_id=quarantined_project_id)
+    if output_stream is not None: _emit(result, output_stream)
+    return result.to_dict()
+
+run_application_loop = run_loop
+run_once = run_loop
+
+def main(argv: Optional[Sequence[str]] = None, *, discovery: Optional[Callable[..., Mapping[str, object]]] = None, planner: Optional[Callable[..., object]] = None, submitter: Optional[Callable[..., object]] = None, now: Optional[Callable[[], object]] = None, clock: Optional[Callable[[], object]] = None, stdout: Optional[TextIO] = None) -> int:
+    parser = argparse.ArgumentParser(allow_abbrev=False); parser.add_argument("--json", action="store_true", required=True); parser.add_argument("--reconcile-only", action="store_true"); parser.add_argument("--state-path", default=str(DEFAULT_STATE_PATH)); args = parser.parse_args(list(argv) if argv is not None else None)
+    output_stream = sys.stdout if stdout is None else stdout
+    result = run_reconcile_only(Path(args.state_path), output_stream=output_stream) if args.reconcile_only else run_loop(discoverer=discovery, planner=planner, submitter=submitter, clock=clock or now, state_path=Path(args.state_path), output_stream=output_stream)
+    return 0 if result["ok"] else 1
+
+__all__ = ["AGENT_RUNNER", "AGENT_RUNNER_PATH", "ApplicationLoopResult", "DEFAULT_EVIDENCE_DIR", "DEFAULT_EVIDENCE_ROOT", "DEFAULT_STATE_PATH", "PLANNER_SCHEMA", "SCHEMA_PATH", "application_tick", "build_planner_prompt", "invoke_planner", "main", "run_application_loop", "run_loop", "run_once", "run_reconcile_only", "status", "validate_decisions"]
+
+if __name__ == "__main__": raise SystemExit(main())

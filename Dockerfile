@@ -1,0 +1,18 @@
+FROM node:20.19-alpine
+
+RUN apk add --no-cache ffmpeg fontconfig font-noto font-noto-cjk python3 py3-pip \
+  && python3 -m venv /opt/lm-python \
+  && /opt/lm-python/bin/pip install --no-cache-dir \
+    websocket-client==1.9.0
+
+ENV PATH="/opt/lm-python/bin:${PATH}"
+WORKDIR /app/apps/rockstar_ibot
+COPY apps/rockstar_ibot/package.json apps/rockstar_ibot/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY apps/rockstar_ibot ./
+COPY packages/telegram-bot-family /app/packages/telegram-bot-family
+COPY config/owner-public.json config/owner-runtime-policy.json /app/config/
+
+USER node
+EXPOSE 8788 8790
+CMD ["node", "server.js"]

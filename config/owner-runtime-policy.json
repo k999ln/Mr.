@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-04",
+  "owner": {
+    "displayName": "Kai",
+    "githubLogin": "k999ln"
+  },
+  "canonicalRepository": "https://github.com/k999ln/Mr.",
+  "mode": "core_only",
+  "autonomousRuntimeActivation": false,
+  "runtimeStateRoot": "~/.local/state/rockstar_ibot",
+  "allowedLiveSlots": [
+    "resource-resolver"
+  ],
+  "activeServices": {
+    "core": "https://avocadomini-core-production.up.railway.app",
+    "telegramBotUsername": "avocadominibot"
+  }
+}

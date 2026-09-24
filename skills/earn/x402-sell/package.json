@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "@blockrun/llm": "^3.13.6",
+    "@coinbase/x402": "^2.1.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@x402/core": "^2.17.0",
+    "@x402/evm": "^2.17.0",
+    "@x402/express": "^2.17.0",
+    "@x402/extensions": "^2.17.0",
+    "@x402/fetch": "^2.18.0",
+    "express": "^5.2.1",
+    "viem": "^2.56.3",
+    "zod": "^3.25.76"
+  },
+  "overrides": {
+    "axios": "1.20.0"
+  }
+}

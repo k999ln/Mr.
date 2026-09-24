@@ -1,0 +1,156 @@
+{
+  "$schema": "earning-health-registry v2",
+  "description": "One registry for required earning slots, their evidence probes, the existing trace-barren self-heal loop, and the four Rockstar_ibot portfolio rails. Every slot is instrumented. A healthy zero-demand rail remains operational; frozen and not-live are explicit states rather than instrumentation gaps.",
+  "slots": [
+    {
+      "id": "earn/sol-trade",
+      "instrumented": true,
+      "traceFile": "sol-trade.trace.jsonl",
+      "minRun": 20,
+      "selfFixTarget": "sol-trade",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "trace",
+        "tracePath": "skills/earn/state/sol-trade.trace.jsonl",
+        "killPath": "skills/earn/sol-trade/KILL",
+        "maxAgeSeconds": 10800
+      }
+    },
+    {
+      "id": "earn/polymarket-trade",
+      "instrumented": true,
+      "traceFile": "pm-trade.trace.jsonl",
+      "minRun": 20,
+      "selfFixTarget": "pm-trade",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "trace",
+        "tracePath": "skills/earn/state/pm-trade.trace.jsonl",
+        "killPath": "skills/earn/polymarket-trade/KILL",
+        "maxAgeSeconds": 10800
+      }
+    },
+    {
+      "id": "economy/gig",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "gig",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "launchd-ledger",
+        "ledgerPaths": [
+          "gig/storefront-direct/wakes.jsonl",
+          "gig/apply-direct/wakes.jsonl"
+        ],
+        "launchdLabels": [
+          "ai.anicca.hf-gig-apply-direct",
+          "ai.anicca.hf-gig-reply-detector",
+          "ai.anicca.hf-gig-paid-direct",
+          "ai.anicca.hf-gig-storefront-direct"
+        ],
+        "maxAgeSeconds": 600
+      }
+    },
+    {
+      "id": "hl_trade",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "hl-trade",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "funded-account",
+        "adapter": "hyperliquid"
+      }
+    },
+    {
+      "id": "x402_sell",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "x402-sell",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "http",
+        "urlEnv": "LM_X402_DISCOVERY_HEALTH_URL",
+        "timeoutMs": 10000
+      }
+    },
+    {
+      "id": "token_launch",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "token-launch",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "explicit",
+        "activationPath": "skills/earn/token-launch/LIVE"
+      }
+    },
+    {
+      "id": "earn/clip",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "clip",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "heartbeat",
+        "heartbeatPath": ".openclaw/state/.clip-core-last-pass",
+        "sessionSocket": "/tmp/anicca-clip-tmux.sock",
+        "sessionName": "anicca-clip-core",
+        "launchdLabel": "ai.anicca.clip-core-healthcheck",
+        "maxAgeSeconds": 5400
+      }
+    },
+    {
+      "id": "earn/video",
+      "instrumented": true,
+      "traceFile": null,
+      "minRun": 20,
+      "selfFixTarget": "video",
+      "escalateEveryHrs": 24,
+      "probe": {
+        "kind": "heartbeat",
+        "heartbeatPath": ".openclaw/state/.video-core-last-pass",
+        "sessionSocket": "/tmp/anicca-video-tmux.sock",
+        "sessionName": "anicca-video-core",
+        "launchdLabel": "ai.anicca.video-core-healthcheck",
+        "maxAgeSeconds": 21600
+      }
+    }
+  ],
+  "portfolios": [
+    {
+      "id": "PM",
+      "memberIds": [
+        "earn/polymarket-trade"
+      ]
+    },
+    {
+      "id": "x402",
+      "memberIds": [
+        "x402_sell"
+      ]
+    },
+    {
+      "id": "WORK",
+      "memberIds": [
+        "economy/gig",
+        "earn/clip",
+        "earn/video"
+      ]
+    },
+    {
+      "id": "CAPITAL",
+      "memberIds": [
+        "earn/polymarket-trade",
+        "earn/sol-trade",
+        "hl_trade",
+        "token_launch"
+      ]
+    }
+  ]
+}

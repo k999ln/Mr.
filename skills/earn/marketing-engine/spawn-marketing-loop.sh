@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# spawn-marketing-loop.sh — the "loop that builds loops". Given a product slug + a free-text
+# product description, uses ONE shared-runner call to fill in the JUDGMENT parts of a
+# marketing-engine manifest (persona / problem / niche / content adapter / bio / cadence hour),
+# writes manifests/<slug>.manifest.sh, validates it via load_manifest.sh, and (optionally)
+# registers the loop via new-marketing-loop.sh. The engine itself stays shared/untouched.
+#
+# usage: spawn-marketing-loop.sh <slug> "<free-text product description incl. what is sold,
+#        the audience, and (optional) a bio/landing URL and a listing-source note>" [--register]
+#
+# Testing override: set SPAWN_FAKE_LLM=<file> to read the 8 judgment lines from a file instead
+# of invoking the shared runner (keeps CI/dev runs free of live model calls).
+set -uo pipefail
+
+SLUG="${1:-}"
+DESC="${2:-}"
+REGISTER="${3:-}"
+
+if [ -z "$SLUG" ] || [ -z "$DESC" ]; then
+  echo 'usage: spawn-marketing-loop.sh <slug> "<free-text product description incl. what is sold, the audience, and (optional) a bio/landing URL and a listing-source note>" [--register]' >&2
+  exit 1
+fi
+
+if ! [[ "$SLUG" =~ ^[a-z][a-z0-9-]{1,30}$ ]]; then
+  echo "spawn-marketing-loop.sh: invalid slug '$SLUG' (must match ^[a-z][a-z0-9-]{1,30}\$)" >&2
+  exit 1
+fi
+
+ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MANIFEST_DIR="$ENGINE_DIR/manifests"
+MANIFEST="$MANIFEST_DIR/${SLUG}.manifest.sh"
+LIFE_MANAGER_STATE_DIR="${LIFE_MANAGER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/rockstar_ibot}"
+
+if [ -f "$MANIFEST" ]; then
+  echo "spawn-marketing-loop.sh: manifest already exists, refusing to overwrite: $MANIFEST" >&2
+  exit 1
+fi
+
+# ── DETERMINISTIC parts (script sets these, NOT the LLM) ──
+HANDLE_PREFIX="$(printf '%s' "$SLUG" | tr -d '-' | cut -c1-12)"
+MKT_INSTANCE="$SLUG"
+MKT_ACCOUNT_STATE_FILE="\$HOME/.cloak/marketing-accounts-${SLUG}.json"
+MKT_HANDLE_PREFIX="$HANDLE_PREFIX"
+MKT_PROFILE_PREFIX="${SLUG}-mkt"
+MKT_GMAIL_PLUS_TAG_PREFIX="$HANDLE_PREFIX"
+
+# ── JUDGMENT parts via shared runner (or SPAWN_FAKE_LLM override for testing) ──
+JUDGMENT_RAW=""
+if [ -n "${SPAWN_FAKE_LLM:-}" ]; then
+  if [ ! -f "$SPAWN_FAKE_LLM" ]; then
+    echo "spawn-marketing-loop.sh: SPAWN_FAKE_LLM file not found: $SPAWN_FAKE_LLM" >&2
+    exit 1
+  fi
+  JUDGMENT_RAW="$(cat "$SPAWN_FAKE_LLM")"
+else
+  PROMPT='You are filling in the JUDGMENT parts of a marketing-loop manifest for this product:
+
+'"$DESC"'
+
+Return manifest_lines containing exactly these 8 lines and no extra keys:
+MKT_PERSONA=<one line>
+MKT_PROBLEM=<one line>
+MKT_NICHE=<short>
+MKT_CONTENT_ADAPTER=<one of: faceless-video|slideshow|carousel|clip-cut>
+MKT_BIO_TEXT=<one-line IG bio, NO link>
+MKT_PRODUCT_SOURCE=<one line: what to enumerate/sell>
+MKT_BIO_LINK=<a URL if the description gave one, else empty>
+MKT_CADENCE_HOUR=<an integer 0-23; default 16 if unsure>'
+
+  EVIDENCE_DIR="$LIFE_MANAGER_STATE_DIR/agent-runner-evidence/marketing-spawn-${SLUG}/$(date +%s)-$$"
+  JUDGMENT_JSON="$(printf '%s\n' "$PROMPT" | "$ENGINE_DIR/run_agent.sh" \
+    --task-class repeatable-agent \
+    --schema "$ENGINE_DIR/schemas/manifest_judgment.schema.json" \
+    --evidence-dir "$EVIDENCE_DIR" \
+    --task-label "marketing-spawn-${SLUG}" \
+    --loop marketing-engine \
+    --print-result)" || exit $?
+  JUDGMENT_RAW="$(printf '%s' "$JUDGMENT_JSON" | /usr/bin/python3 -c 'import json,sys; data=json.load(sys.stdin); lines=data.get("manifest_lines", []); len(lines) == 8 or sys.exit("expected exactly 8 manifest_lines"); print("\\n".join(lines))')" || exit $?
+fi
+
+# ── PARSE defensively: keep only MKT_*= lines, whitelist exactly the 8 judgment keys ──
+J_MKT_PERSONA=""; J_MKT_PROBLEM=""; J_MKT_NICHE=""; J_MKT_CONTENT_ADAPTER=""
+J_MKT_BIO_TEXT=""; J_MKT_PRODUCT_SOURCE=""; J_MKT_BIO_LINK=""; J_MKT_CADENCE_HOUR=""
+
+while IFS= read -r line; do
+  [[ "$line" =~ ^MKT_[A-Z_]+= ]] || continue
+  key="${line%%=*}"
+  val="${line#*=}"
+  case "$key" in
+    MKT_PERSONA) J_MKT_PERSONA="$val" ;;
+    MKT_PROBLEM) J_MKT_PROBLEM="$val" ;;
+    MKT_NICHE) J_MKT_NICHE="$val" ;;
+    MKT_CONTENT_ADAPTER) J_MKT_CONTENT_ADAPTER="$val" ;;
+    MKT_BIO_TEXT) J_MKT_BIO_TEXT="$val" ;;
+    MKT_PRODUCT_SOURCE) J_MKT_PRODUCT_SOURCE="$val" ;;
+    MKT_BIO_LINK) J_MKT_BIO_LINK="$val" ;;
+    MKT_CADENCE_HOUR) J_MKT_CADENCE_HOUR="$val" ;;
+    *) ;; # not one of the 8 whitelisted keys — drop
+  esac
+done <<< "$JUDGMENT_RAW"
+
+case "$J_MKT_CONTENT_ADAPTER" in
+  faceless-video|slideshow|carousel|clip-cut) ;;
+  *) J_MKT_CONTENT_ADAPTER="faceless-video" ;;
+esac
+
+if ! [[ "$J_MKT_CADENCE_HOUR" =~ ^[0-9]+$ ]] || [ "$J_MKT_CADENCE_HOUR" -lt 0 ] || [ "$J_MKT_CADENCE_HOUR" -gt 23 ]; then
+  J_MKT_CADENCE_HOUR="16"
+fi
+
+# ── WRITE manifests/<slug>.manifest.sh ──
+mkdir -p "$MANIFEST_DIR"
+{
+  echo "# ${SLUG} marketing loop manifest — the ONLY per-loop config. Engine is SHARED in ../ ."
+  echo "# Generated by spawn-marketing-loop.sh from a free-text product description."
+  echo "#"
+  echo "#   WHO (persona) · WHAT PROBLEM · WHAT you sell (product) · HOW (content adapter)"
+  echo ""
+  echo "# ── WHO / WHAT PROBLEM ──"
+  echo "MKT_PERSONA=\"${J_MKT_PERSONA}\""
+  echo "MKT_PROBLEM=\"${J_MKT_PROBLEM}\""
+  echo ""
+  echo "# ── WHAT you sell (product) ──"
+  echo "MKT_INSTANCE=\"${MKT_INSTANCE}\""
+  echo "MKT_PRODUCT_SOURCE=\"${J_MKT_PRODUCT_SOURCE}\""
+  echo "MKT_LISTING_URL_FMT=\"\""
+  echo "MKT_BIO_LINK=\"${J_MKT_BIO_LINK}\""
+  echo "MKT_LANDING_SITE_ID=\"\""
+  echo ""
+  echo "# ── HOW (content) ──"
+  echo "MKT_CONTENT_ADAPTER=\"${J_MKT_CONTENT_ADAPTER}\"          # faceless-video | slideshow | carousel | clip-cut"
+  echo "MKT_NICHE=\"${J_MKT_NICHE}\""
+  echo ""
+  echo "# ── account / provision (fed to shared provision_prompt.sh) ──"
+  echo "MKT_ACCOUNT_STATE_FILE=\"${MKT_ACCOUNT_STATE_FILE}\""
+  echo "MKT_HANDLE_PREFIX=\"${MKT_HANDLE_PREFIX}\""
+  echo "MKT_PROFILE_PREFIX=\"${MKT_PROFILE_PREFIX}\""
+  echo "MKT_GMAIL_PLUS_TAG_PREFIX=\"${MKT_GMAIL_PLUS_TAG_PREFIX}\""
+  echo "MKT_BIO_TEXT=\"${J_MKT_BIO_TEXT}\""
+  echo ""
+  echo "# ── cadence ──"
+  echo "MKT_CADENCE_HOUR=\"${J_MKT_CADENCE_HOUR}\"                          # daily launchd hour (JST)"
+} > "$MANIFEST"
+
+# ── VALIDATE ──
+# shellcheck source=/dev/null
+. "$ENGINE_DIR/load_manifest.sh"
+if ! me_load_manifest "$SLUG"; then
+  echo "spawn-marketing-loop.sh: generated manifest failed validation, deleting: $MANIFEST" >&2
+  rm -f "$MANIFEST"
+  exit 1
+fi
+
+echo "manifest written and valid: $MANIFEST"
+
+if [ "$REGISTER" = "--register" ]; then
+  "$ENGINE_DIR/new-marketing-loop.sh" "$SLUG"
+else
+  echo "manifest written and valid; run new-marketing-loop.sh $SLUG to register"
+fi
+
+echo "manifest path: $MANIFEST"
+echo "MKT_INSTANCE=$MKT_INSTANCE"

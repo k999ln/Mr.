@@ -1,0 +1,121 @@
+{
+  "featureName": "franklin-earn-foundation",
+  "mode": "lean",
+  "currentPhase": "complete",
+  "phaseHistory": [
+    {
+      "from": "init",
+      "to": "1a",
+      "timestamp": "2026-07-08T11:53:27.748Z"
+    },
+    {
+      "from": "1a",
+      "to": "1b",
+      "timestamp": "2026-07-08T11:53:31.003Z"
+    },
+    {
+      "from": "1b",
+      "to": "1c",
+      "timestamp": "2026-07-08T13:06:22.916Z"
+    },
+    {
+      "from": "1c",
+      "to": "2a",
+      "timestamp": "2026-07-08T13:06:22.926Z",
+      "sprint": 1
+    },
+    {
+      "from": "2a",
+      "to": "2b",
+      "timestamp": "2026-07-08T15:28:07.049Z",
+      "sprint": 1
+    },
+    {
+      "from": "2b",
+      "to": "2c",
+      "timestamp": "2026-07-08T15:28:16.348Z",
+      "sprint": 1
+    },
+    {
+      "from": "2c",
+      "to": "3",
+      "timestamp": "2026-07-08T15:28:16.354Z",
+      "sprint": 1
+    },
+    {
+      "from": "3",
+      "to": "5",
+      "timestamp": "2026-07-08T15:28:36.253Z",
+      "sprint": 1
+    },
+    {
+      "from": "5",
+      "to": "6",
+      "timestamp": "2026-07-08T15:31:58.558Z",
+      "sprint": 1
+    },
+    {
+      "from": "6",
+      "to": "complete",
+      "timestamp": "2026-07-10T03:30:00.000Z",
+      "note": "Converge iter2 PASS all 4 dims, 0 blocking. FIND-CONV-001 (spec) + FIND-CONV-002 (report/PROP discharge) closed. Orchestrator self-executed 58/58 node + 9/9 bash green (log captured). Money-safety invariants re-confirmed: no cross-instance key fallback, spend cap wired, wins+losses recorded, external:true only cash-settled."
+    }
+  ],
+  "iterations": {
+    "3": 1,
+    "5": 1,
+    "6": 1,
+    "1a": 1,
+    "1b": 1,
+    "1c": 1,
+    "2a": 1,
+    "2b": 1,
+    "2c": 1
+  },
+  "proofObligations": [],
+  "traceability": {
+    "epicId": "VCSDD-franklin-earn-foundation-1783510968203",
+    "beads": []
+  },
+  "gates": {
+    "3": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-08T15:28:16.355Z",
+      "reviewedBy": "adversary"
+    },
+    "1c": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-10T02:30:00.000Z",
+      "reviewedBy": "adversary",
+      "adversaryVerdict": "PASS",
+      "iteration": 4,
+      "verdictPath": "reviews/spec/iteration-4/output/verdict.json",
+      "note": "Fresh Opus iter4 spec-review PASS both dimensions; FIND-009 (single authoritative delta source usdcDeltaForSig) + FIND-010 (never call franklin-trading balance, ANSI risk eliminated) CONFIRMED-RESOLVED against real shipped code. Closes converge FIND-CONV-001 (now a real supporting PASS artifact exists). Non-blocking FIND-011 (ANSI-strip test hygiene) routed to phase 2a."
+    },
+    "6": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-10T03:30:00.000Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "phase": "converge",
+        "iteration": 2,
+        "dimensions": "spec/test/impl/harden all PASS",
+        "blockingFindings": 0,
+        "verdictPath": "reviews/converge/iteration-2/output/verdict.json",
+        "closedFindings": [
+          "FIND-CONV-001 (spec cert via iter4 PASS)",
+          "FIND-CONV-002 (verification-report 16 PROP correctly discharged)"
+        ],
+        "selfExecutedTests": "58/58 node + 9/9 bash green, log node-test-58-2026-07-10.log",
+        "nonBlocking": [
+          "state iteration counters cosmetic",
+          "FIND-011 ANSI-strip untested"
+        ],
+        "reviewer": "fresh-opus-adversary claude-opus-4-8"
+      }
+    }
+  },
+  "sprintCount": 1,
+  "createdAt": "2026-07-08T11:42:48.185Z",
+  "updatedAt": "2026-07-10T03:30:00.000Z"
+}

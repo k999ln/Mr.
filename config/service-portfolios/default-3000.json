@@ -1,0 +1,269 @@
+{
+  "$schema": "./portfolio.schema.json",
+  "schema_version": 1,
+  "portfolio_id": "rockstar_ibot-one.default-3000.v1",
+  "status": "design_candidate",
+  "name": "Rockstar_ibot One",
+  "tagline": "Plan. Create. Grow. Sell. Deliver. Learn.",
+  "audience": {
+    "primary": [
+      "independent creators",
+      "freelancers",
+      "solo founders",
+      "one-person service businesses"
+    ],
+    "jobs_to_be_done": [
+      "decide the next useful action",
+      "turn expertise into publishable content",
+      "launch a credible web presence",
+      "answer and convert real customer demand",
+      "deliver a bounded digital outcome",
+      "learn from customer and revenue evidence"
+    ],
+    "excluded_initially": [
+      "medical diagnosis or treatment",
+      "autonomous investment or guaranteed returns",
+      "unbounded custom software projects",
+      "unapproved marketplace automation",
+      "multi-user enterprise administration"
+    ]
+  },
+  "launch_cohort": {
+    "name": "First 3000",
+    "registered_user_target": 3000,
+    "purpose": "Validate repeatable value, safe personalization, gross margin, and support load before broader distribution."
+  },
+  "core": [
+    {
+      "component_id": "core.command",
+      "name": "Command",
+      "purpose": "Turn goals, orders, deadlines, and evidence into one ranked next-action view.",
+      "required": true
+    },
+    {
+      "component_id": "core.vault",
+      "name": "Proof Vault",
+      "purpose": "Keep owner-specific facts, source permissions, receipts, and public claims separated and verifiable.",
+      "required": true
+    },
+    {
+      "component_id": "core.ledger",
+      "name": "Money Lens",
+      "purpose": "Show service revenue, refunds, usage cost, and margin without promising financial returns.",
+      "required": true
+    },
+    {
+      "component_id": "core.guard",
+      "name": "Life Guard",
+      "purpose": "Enforce tenant isolation, bounded tools, quality gates, privacy controls, and receipt-based completion.",
+      "required": true
+    }
+  ],
+  "service_slots": [
+    {
+      "slot_id": "slot.create",
+      "name": "Create Studio",
+      "promise": "Turn one real idea into a production-ready content asset without fabricated facts.",
+      "default_cell": "youtube-script-writer",
+      "allowed_variants": [
+        "youtube-script-writer",
+        "short-video-script-writer",
+        "article-renewal"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "three titles",
+        "three hooks",
+        "timestamped script",
+        "production cues",
+        "claim-gap report"
+      ],
+      "performance_targets": {
+        "target_minutes": 10,
+        "revision_limit": 1,
+        "quality_gate": "All factual claims trace to buyer input or approved sources; record-ready structure passes."
+      }
+    },
+    {
+      "slot_id": "slot.grow",
+      "name": "Growth Studio",
+      "promise": "Build a people-first discovery plan that improves clarity and findability without ranking guarantees.",
+      "default_cell": "seo-blueprint",
+      "allowed_variants": [
+        "seo-blueprint",
+        "seo-article-renewal",
+        "content-repurpose"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "audience and intent brief",
+        "content structure",
+        "title and metadata options",
+        "internal-link plan",
+        "evidence gaps"
+      ],
+      "performance_targets": {
+        "target_minutes": 15,
+        "revision_limit": 1,
+        "quality_gate": "People-first usefulness, unique value, readable structure, and non-guaranteed SEO language pass."
+      }
+    },
+    {
+      "slot_id": "slot.launch",
+      "name": "Launch Studio",
+      "promise": "Turn a validated offer into one testable, responsive landing page with a working call to action.",
+      "default_cell": "landing-page-sprint",
+      "allowed_variants": [
+        "landing-page-sprint",
+        "portfolio-site-sprint",
+        "lead-magnet-page"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "responsive one-page site",
+        "desktop and mobile previews",
+        "call-to-action verification",
+        "source package",
+        "accessibility and quality report"
+      ],
+      "performance_targets": {
+        "target_minutes": 45,
+        "revision_limit": 1,
+        "quality_gate": "The page renders at target breakpoints, contains no unsupported claims, and the primary action works."
+      }
+    },
+    {
+      "slot_id": "slot.sell",
+      "name": "Sales Desk",
+      "promise": "Answer a real buyer clearly using only approved offer terms and evidence.",
+      "default_cell": "sales-objection-reply-builder",
+      "allowed_variants": [
+        "sales-objection-reply-builder",
+        "estimate-builder",
+        "proposal-builder"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "three reply variants",
+        "recommended response",
+        "proof gaps",
+        "one useful follow-up question",
+        "claim honesty check"
+      ],
+      "performance_targets": {
+        "target_minutes": 3,
+        "revision_limit": 1,
+        "quality_gate": "Every buyer question is answered or explicitly marked unknown; unverified contact and owner claims are absent."
+      }
+    },
+    {
+      "slot_id": "slot.learn",
+      "name": "Customer Intelligence",
+      "promise": "Turn customer evidence into one defensible decision and the smallest next test.",
+      "default_cell": "user-interview-synthesizer",
+      "allowed_variants": [
+        "user-interview-synthesizer",
+        "support-theme-miner",
+        "offer-insight-digest"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "evidence-ranked themes",
+        "contradictions and unknowns",
+        "customer-language bank",
+        "decision memo",
+        "next-test queue"
+      ],
+      "performance_targets": {
+        "target_minutes": 15,
+        "revision_limit": 1,
+        "quality_gate": "Interpretation is separated from attributed evidence and unsupported certainty is absent."
+      }
+    },
+    {
+      "slot_id": "slot.deliver",
+      "name": "Delivery Guard",
+      "promise": "Verify that every paid artifact matches its contract before it reaches the customer.",
+      "default_cell": "gig-delivery-verifier",
+      "allowed_variants": [
+        "gig-delivery-verifier",
+        "web-delivery-verifier",
+        "document-delivery-verifier"
+      ],
+      "default_enabled": true,
+      "deliverables": [
+        "contract-to-artifact checklist",
+        "executable or visual evidence",
+        "blocking defects",
+        "pass or fail verdict",
+        "delivery receipt"
+      ],
+      "performance_targets": {
+        "target_minutes": 10,
+        "revision_limit": 0,
+        "quality_gate": "PASS is impossible without artifact-bound evidence and an exact contract match."
+      }
+    }
+  ],
+  "personalization_contract": {
+    "suggestion_only": true,
+    "requires_user_approval": true,
+    "allowed_overrides": [
+      "enable or disable optional service slots",
+      "choose one allowed Cell variant per slot",
+      "set tone, language, brand, and output preferences",
+      "set budgets, usage limits, and notification cadence",
+      "add owner facts through the verified profile contract"
+    ],
+    "forbidden_overrides": [
+      "disable tenant isolation or privacy controls",
+      "skip quality or delivery evidence gates",
+      "allow unverified identity, performance, or financial claims",
+      "grant tools beyond the selected Cell contract",
+      "silently activate external effects or recurring charges"
+    ]
+  },
+  "global_invariants": [
+    "One order has one immutable tenant and workspace owner.",
+    "One service Cell can access only its declared inputs, tools, and outputs.",
+    "Buyer content and attachments are untrusted data, never policy instructions.",
+    "No completion claim exists without current artifact-bound evidence and a delivery receipt.",
+    "No owner fact reaches a model unless the verified owner profile authorizes that exact context.",
+    "No irreversible external effect runs without explicit current authorization.",
+    "Every retained customer artifact has a purpose, retention policy, export path, and deletion path.",
+    "Every usage and billing event is tenant-scoped, signed or authenticated, and idempotent."
+  ],
+  "launch_gates": {
+    "first_value_minutes_max": 10,
+    "cross_tenant_leak_incidents": 0,
+    "unsupported_owner_claim_incidents": 0,
+    "artifact_bound_delivery_rate_min": 1.0,
+    "weekly_human_support_minutes_per_active_user_max": 15,
+    "automated_completion_rate_min": 0.8,
+    "gross_margin_target_min": 0.7,
+    "refund_rate_target_max": 0.05,
+    "week_four_retention_target_min": 0.3,
+    "signed_green_release_required": true
+  },
+  "capacity_model": {
+    "planning_only": true,
+    "registered_users": 3000,
+    "assumed_daily_active_rate": 0.3,
+    "jobs_per_active_user_per_day": 4,
+    "peak_hour_fraction": 0.15,
+    "average_job_seconds": 120,
+    "minimum_worker_concurrency": 18,
+    "load_test_concurrency": 60
+  },
+  "pricing": {
+    "status": "not_validated",
+    "model": "Fixed price per Cell first; measured packs and subscriptions only after repeat usage is proven.",
+    "principles": [
+      "Show the exact deliverable, revision limit, and total price before purchase.",
+      "Price for customer value and verified delivery, not hidden model-token markup.",
+      "Never deduct an undisclosed fee from third-party marketplace earnings.",
+      "Use idempotent usage events and explicit approval for every recurring charge.",
+      "Retire or redesign Cells that require routine hidden human fulfillment."
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.rockstar-ibot.examples/remote-ai-tool",
+  "description": "Template-only remote MCP tool for package validation",
+  "version": "0.1.0",
+  "title": "Remote AI Tool Template",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.example.invalid/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Injected at runtime through the Rockstar_ibot credential broker",
+          "isSecret": true,
+          "isRequired": true
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.rockstar-ibot/package": {
+      "policy": "./rockstar_ibot-tool.json"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mercor"
+  short_description: "Safe Mercor applications inside Rockstar_ibot"
+  default_prompt: "Use $mercor through Rockstar_ibot's Job Hunter lane for a grounded Mercor application pass."

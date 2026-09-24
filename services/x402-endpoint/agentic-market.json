@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "status": "disabled_owner_configuration_required",
+  "service": "Rockstar_ibot x402 endpoint",
+  "required_public_values": [
+    "LIFE_MANAGER_PAY_TO",
+    "LM_X402_PUBLIC_URL",
+    "LIFE_MANAGER_CONTACT_EMAIL",
+    "LIFE_MANAGER_CONTACT_URL"
+  ],
+  "reason": "No Kai-owned wallet, public endpoint, or public contact has been configured. Generate discovery metadata from verified owner values; do not reuse historical endpoint metadata."
+}

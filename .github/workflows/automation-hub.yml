@@ -1,0 +1,28 @@
+name: Automation Hub foundation
+on:
+  pull_request:
+    paths: ['apps/rockstar_ibot-hub/**', 'packages/automation-hub/**', 'services/automation-runner/**', 'deploy/automation-os/**', 'scripts/sync-automation-hub.mjs', 'test/automation-hub*.test.mjs', '.github/workflows/automation-hub.yml']
+  push:
+    branches: [main]
+    paths: ['apps/rockstar_ibot-hub/**', 'packages/automation-hub/**', 'services/automation-runner/**', 'deploy/automation-os/**', 'scripts/sync-automation-hub.mjs', 'test/automation-hub*.test.mjs', '.github/workflows/automation-hub.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/rockstar_ibot-hub/package-lock.json
+      - run: npm run hub:check && npm run test:automation-hub
+      - run: npm ci --ignore-scripts
+        working-directory: apps/rockstar_ibot-hub
+      - run: npm test
+        working-directory: apps/rockstar_ibot-hub
+      - run: npx tsc --noEmit && npm run lint && npm run build
+        working-directory: apps/rockstar_ibot-hub
+      - run: docker compose -f deploy/automation-os/compose.yaml config --quiet

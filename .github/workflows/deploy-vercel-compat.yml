@@ -1,0 +1,67 @@
+name: Deploy Vercel compatibility URL
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-vercel-compat.yml
+      - apps/doraemon-vercel-proxy/**
+      - config/owner-public.json
+      - test/vercel-proxy.test.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avocadomini-vercel-compat-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_Nj8KnedStYWUrfXoRBv1Ud30
+  VERCEL_PROJECT_ID: prj_6wzteHyxCBahc6ZwG24AEm0kDg0Q
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact canonical redirect contract
+        run: node --test test/vercel-proxy.test.mjs
+      - name: Check encrypted deploy credential
+        id: credential
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -n "$VERCEL_TOKEN" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'VERCEL_TOKEN is not configured; redirect verification passed and deployment was safely skipped.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Build and deploy the linked Vercel project
+        if: steps.credential.outputs.enabled == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes vercel@59.11.7 pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@59.11.7 build --prod --token="$VERCEL_TOKEN"
+          deployment_url="$(npx --yes vercel@59.11.7 deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "Deployment URL: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify public compatibility URL
+        if: steps.credential.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(curl --silent --show-error --output /dev/null --max-redirs 0 \
+            --write-out '%{http_code} %{redirect_url}' \
+            'https://doraos.vercel.app/start?tools=request%2Ccheck')"
+          [[ "$result" == '307 https://effect-os-verified.kirin-999.chatgpt.site/start?tools=request%2Ccheck' ]]
+          echo 'Compatibility URL: HTTP 307 with path/query preserved' >> "$GITHUB_STEP_SUMMARY"
+

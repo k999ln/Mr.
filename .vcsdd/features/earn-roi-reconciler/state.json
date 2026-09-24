@@ -1,0 +1,185 @@
+{
+  "featureName": "earn-roi-reconciler",
+  "mode": "lean",
+  "language": "python",
+  "currentPhase": "complete",
+  "phaseHistory": [
+    {
+      "from": "init",
+      "to": "1a",
+      "timestamp": "2026-07-01T08:04:07.885Z"
+    },
+    {
+      "from": "1a",
+      "to": "1b",
+      "timestamp": "2026-07-01T08:04:07.889Z"
+    },
+    {
+      "from": "1b",
+      "to": "1c",
+      "timestamp": "2026-07-01T08:11:52.582Z"
+    },
+    {
+      "from": "1c",
+      "to": "2a",
+      "timestamp": "2026-07-01T08:11:52.592Z",
+      "sprint": 1
+    },
+    {
+      "from": "2a",
+      "to": "2b",
+      "timestamp": "2026-07-01T08:16:30.862Z",
+      "sprint": 1
+    },
+    {
+      "from": "2b",
+      "to": "2c",
+      "timestamp": "2026-07-01T08:16:30.866Z",
+      "sprint": 1
+    },
+    {
+      "from": "2c",
+      "to": "3",
+      "timestamp": "2026-07-01T08:23:49.337Z",
+      "sprint": 1
+    },
+    {
+      "from": "3",
+      "to": "5",
+      "timestamp": "2026-07-01T08:23:49.341Z",
+      "sprint": 1
+    },
+    {
+      "from": "5",
+      "to": "6",
+      "timestamp": "2026-07-01T08:25:07.201Z",
+      "sprint": 1
+    },
+    {
+      "from": "6",
+      "to": "complete",
+      "timestamp": "2026-07-01T08:25:14.887Z",
+      "sprint": 1
+    }
+  ],
+  "iterations": {
+    "3": 1,
+    "5": 1,
+    "6": 1,
+    "1a": 1,
+    "1b": 1,
+    "1c": 1,
+    "2a": 1,
+    "2b": 1,
+    "2c": 1,
+    "complete": 1
+  },
+  "proofObligations": [],
+  "traceability": {
+    "epicId": "VCSDD-earn-roi-reconciler-1782892961385",
+    "beads": [
+      {
+        "beadId": "BEAD-001",
+        "type": "adversary-finding",
+        "externalId": "FIND-001",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-001.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      },
+      {
+        "beadId": "BEAD-002",
+        "type": "adversary-finding",
+        "externalId": "FIND-002",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-002.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      },
+      {
+        "beadId": "BEAD-003",
+        "type": "adversary-finding",
+        "externalId": "FIND-003",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-003.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      },
+      {
+        "beadId": "BEAD-004",
+        "type": "adversary-finding",
+        "externalId": "FIND-004",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-004.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      },
+      {
+        "beadId": "BEAD-005",
+        "type": "adversary-finding",
+        "externalId": "FIND-005",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-005.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      },
+      {
+        "beadId": "BEAD-006",
+        "type": "adversary-finding",
+        "externalId": "FIND-006",
+        "artifactPath": ".vcsdd/features/earn-roi-reconciler/reviews/sprint-1/output/findings/FIND-006.json",
+        "status": "resolved",
+        "linkedBeads": [],
+        "createdAt": "2026-07-01T00:00:00Z"
+      }
+    ]
+  },
+  "gates": {
+    "3": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T08:23:49.333Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "iterations": 2,
+        "findingDiminishment": [
+          6,
+          0
+        ]
+      }
+    },
+    "6": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T08:25:07.205Z",
+      "reviewedBy": "verifier",
+      "details": {
+        "convergenceSignals": {
+          "findingDiminishment": [
+            6,
+            0
+          ],
+          "iterations": 2,
+          "sprints": 1,
+          "totalTestsPassing": 432
+        }
+      }
+    },
+    "1c": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T08:11:52.574Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "iterations": 3,
+        "findingDiminishment": [
+          6,
+          2,
+          0
+        ]
+      },
+      "adversaryVerdict": "PASS",
+      "adversaryReviewedAt": "2026-07-01T08:11:52.574Z"
+    }
+  },
+  "sprintCount": 1,
+  "createdAt": "2026-07-01T08:02:41.383Z",
+  "updatedAt": "2026-07-01T08:25:14.887Z"
+}

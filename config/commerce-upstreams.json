@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "evaluation_only",
+  "captured_at": "2026-08-31",
+  "upstreams": [
+    {"name":"Formance Ledger","path":"vendor/commerce-upstreams/formance-ledger","commit":"dcc42d8efcfdbf63c847af2460b277eda83a75ba","license":"MIT","role":"operational money ledger","deployment":"separate_service"},
+    {"name":"Temporal","path":"vendor/commerce-upstreams/temporal","commit":"c044bf16b1cc47a4db80669a987484dba6145331","license":"MIT","role":"durable long-running workflows","deployment":"separate_service"},
+    {"name":"OpenFGA","path":"vendor/commerce-upstreams/openfga","commit":"a7dfe8491dc7f9cd5905f4e9ae6c8e1d718c4bd9","license":"Apache-2.0","role":"authorization checks","deployment":"separate_service"},
+    {"name":"grammY","path":"vendor/commerce-upstreams/grammy","commit":"055a5a440f04d0b9fd5fd75a6d14dac4c2b83553","license":"MIT","role":"Telegram adapter reference","deployment":"application_dependency"},
+    {"name":"Payload","path":"vendor/commerce-upstreams/payload","commit":"72ee1751b153bd1cf9e44a7fad85563fa3f57b4e","license":"MIT","role":"content and evidence revisions","deployment":"separate_service"},
+    {"name":"GrowthBook","path":"vendor/commerce-upstreams/growthbook","commit":"de4ff6b5256c13764239f9ed3560e281c5728592","license":"MIT","role":"experiments","deployment":"separate_service"},
+    {"name":"Casdoor","path":"vendor/commerce-upstreams/casdoor","commit":"22d5769a2fad741082f4b11a140c8f65fdc8385e","license":"Apache-2.0","role":"operator IAM","deployment":"separate_service"},
+    {"name":"Chatwoot","path":"vendor/commerce-upstreams/chatwoot","commit":"642223fb3157f3e9b9e33c7e915d824f7d6d1f5f","license":"MIT-core","role":"support adapter","deployment":"separate_service","caution":"enterprise split and current advisories require review"},
+    {"name":"Medusa","path":"vendor/commerce-upstreams/medusa","commit":"f7317903600e5b64f06c21c29a73e0e569d2fe3a","license":"MIT-core","role":"commerce adapter","deployment":"separate_service","caution":"enterprise edition boundary requires review"}
+  ]
+}

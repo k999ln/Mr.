@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://effect-os-verified.kirin-999.chatgpt.site/:path*",
+      "permanent": false
+    }
+  ]
+}

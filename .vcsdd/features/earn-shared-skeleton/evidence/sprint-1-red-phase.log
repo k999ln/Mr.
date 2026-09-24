@@ -1,0 +1,22 @@
+new-feature-tests: FAIL
+regression-baseline: PASS
+total-test-modules: 14
+total-tests-defined: 95
+collection-errors: 4
+
+# new-feature-tests: FAIL — 4 test modules still fail at import (lib/spawn_pin,
+#   lib/proposal_loop, lib/deliverable_loop, lib/group_j) — these are Phase 2b targets.
+# regression-baseline: PASS — no pre-existing tests in ~/anicca/skills/_shared/.
+# 7 of 14 test modules are GREEN (cumulative impl progress):
+#   lib/healthcheck.py    → test_classify, test_oauth, test_hook_allowlist (42/42)
+#   lib/roi.py            → test_roi, test_killswitch (20/20)
+#   lib/lessons.py        → test_evidence (17/17)
+#   lib/escalate.py       → test_dedup (10/10)
+#   lib/manifest.py       → test_g2_static (5/5)
+#   lib/events.py         → test_g2_runtime (7/7)
+#   lib/mutation_gate.py  → test_mutation_gate (3/3)
+# 4 test modules remain RED (Phase 2b targets):
+#   test_spawn_pin.py        (12 fixture cases f-i..f-xii)
+#   test_proposal_loop.py    (5 cases — PROP-I1)
+#   test_deliverable_loop.py (4 cases — PROP-I2)
+#   test_group_j.py          (~13 cases — PROP-J8 anti-human-touch + dispatcher)

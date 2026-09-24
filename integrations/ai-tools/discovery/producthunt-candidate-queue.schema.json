@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/k999ln/Mr./main/integrations/ai-tools/discovery/producthunt-candidate-queue.schema.json",
+  "title": "Rockstar_ibot Product Hunt candidate queue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "source",
+    "generatedAt",
+    "expiresAt",
+    "search",
+    "intake",
+    "receipt",
+    "candidates"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/k999ln/Mr./main/integrations/ai-tools/discovery/producthunt-candidate-queue.schema.json"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "method",
+        "endpoint",
+        "attributionLabel",
+        "attributionUrl"
+      ],
+      "properties": {
+        "id": {
+          "const": "producthunt"
+        },
+        "displayName": {
+          "const": "Product Hunt"
+        },
+        "method": {
+          "const": "official_graphql_api"
+        },
+        "endpoint": {
+          "const": "https://api.producthunt.com/v2/api/graphql"
+        },
+        "attributionLabel": {
+          "const": "Source: Product Hunt"
+        },
+        "attributionUrl": {
+          "const": "https://www.producthunt.com"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "queries",
+        "matchedTopics",
+        "postedAfter",
+        "postedBefore"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "topics_then_posts"
+        },
+        "queries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          }
+        },
+        "matchedTopics": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "$ref": "#/$defs/matchedTopic"
+          }
+        },
+        "postedAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "postedBefore": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "intake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "autoApprovePackages",
+        "installEnabled",
+        "executionEnabled",
+        "candidateDataTrusted",
+        "websiteVisitEnabled",
+        "integrityState"
+      ],
+      "properties": {
+        "state": {
+          "const": "candidate_only"
+        },
+        "autoApprovePackages": {
+          "const": false
+        },
+        "installEnabled": {
+          "const": false
+        },
+        "executionEnabled": {
+          "const": false
+        },
+        "candidateDataTrusted": {
+          "const": false
+        },
+        "websiteVisitEnabled": {
+          "const": false
+        },
+        "integrityState": {
+          "const": "unsigned_operator_observation"
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "querySha256",
+        "operationSetSha256",
+        "candidateSetSha256",
+        "requestCount",
+        "responseBytes",
+        "observedCandidateCount",
+        "retainedCandidateIds",
+        "commercialApprovalReference",
+        "rateLimit"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "pattern": "^producthunt:[a-f0-9]{24}$"
+        },
+        "querySha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operationSetSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateSetSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "requestCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 48
+        },
+        "responseBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8388608
+        },
+        "observedCandidateCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 800
+        },
+        "retainedCandidateIds": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^producthunt:[A-Za-z0-9_-]{1,128}$"
+          }
+        },
+        "commercialApprovalReference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:./_-]{0,199}$"
+        },
+        "rateLimit": {
+          "$ref": "#/$defs/rateLimit"
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rateLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "limit",
+        "remaining",
+        "reset"
+      ],
+      "properties": {
+        "limit": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "remaining": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "reset": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "matchedTopic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "sourceUrl",
+        "matchedQueries"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://(www\\.)?producthunt\\.com/"
+        },
+        "matchedQueries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          }
+        }
+      }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "slug",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId",
+        "sourceProductId",
+        "name",
+        "tagline",
+        "sourceUrl",
+        "websiteUrl",
+        "observedLaunchAt",
+        "featuredAt",
+        "votesCount",
+        "topics",
+        "matchedQueries",
+        "relevanceScore",
+        "state",
+        "contentTrust",
+        "nextReview",
+        "websiteVisitAllowed"
+      ],
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "pattern": "^producthunt:[A-Za-z0-9_-]{1,128}$"
+        },
+        "sourceProductId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "tagline": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://(www\\.)?producthunt\\.com/"
+        },
+        "websiteUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "observedLaunchAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "featuredAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "votesCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "topics": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/topic"
+          }
+        },
+        "matchedQueries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80
+          }
+        },
+        "relevanceScore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state": {
+          "const": "candidate_only"
+        },
+        "contentTrust": {
+          "const": "untrusted_external_metadata"
+        },
+        "nextReview": {
+          "const": "publisher_api_mcp_terms_security"
+        },
+        "websiteVisitAllowed": {
+          "const": false
+        }
+      }
+    }
+  }
+}

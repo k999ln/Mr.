@@ -1,0 +1,12 @@
+{
+  "name": "@rockstar_ibot/telegram-bot-family",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Twenty owner-controlled Telegram bot profiles sharing one Rockstar_ibot Core contract.",
+  "exports": "./index.mjs",
+  "scripts": {
+    "test": "node --test __tests__/*.test.mjs",
+    "validate": "node ./validate.mjs"
+  }
+}

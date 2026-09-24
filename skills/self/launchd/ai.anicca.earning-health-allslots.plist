@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>ai.anicca.earning-health-allslots</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>__REPO_ROOT__/skills/self/earning-health-allslots.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>__HOME__</string>
+		<key>EARNHC_REGISTRY</key>
+		<string>__REPO_ROOT__/skills/self/earning-health-registry.json</string>
+		<key>EARNHC_EARN_STATE_DIR</key>
+		<string>__HOME__/.blockrun/skills/earn/state</string>
+	</dict>
+	<key>StartInterval</key>
+	<integer>300</integer>
+	<key>ThrottleInterval</key>
+	<integer>60</integer>
+	<key>StandardOutPath</key>
+	<string>__LIFE_MANAGER_HOME__/logs/earning-health-allslots-launchd.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>__LIFE_MANAGER_HOME__/logs/earning-health-allslots-launchd.err.log</string>
+</dict>
+</plist>

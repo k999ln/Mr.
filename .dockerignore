@@ -1,0 +1,40 @@
+*
+!Dockerfile
+!railway.toml
+!apps/
+apps/*
+!apps/rockstar_ibot/
+!apps/rockstar_ibot/**
+!packages/
+!packages/telegram-bot-family/
+!packages/telegram-bot-family/**
+!config/
+config/*
+!config/owner-public.json
+!config/owner-runtime-policy.json
+
+# Git retains these quarantined implementations for audit, but the Kai-owned
+# Core production image must not contain legacy social publishers or an
+# autonomous outgoing-payout worker.
+apps/rockstar_ibot/lib/marketing-*
+apps/rockstar_ibot/scripts/*instagram*
+apps/rockstar_ibot/scripts/*marketing*
+apps/rockstar_ibot/scripts/anicca-*
+apps/rockstar_ibot/scripts/honne-*
+apps/rockstar_ibot/scripts/import-marketing-*
+apps/rockstar_ibot/scripts/payout-boot.sh
+apps/rockstar_ibot/scripts/run-agent-payout.js
+apps/rockstar_ibot/scripts/install-payout-launchd.sh
+apps/rockstar_ibot/launchd/*instagram*
+apps/rockstar_ibot/launchd/*marketing*
+apps/rockstar_ibot/launchd/*payout*
+**/.env
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.mp4
+**/*.mov
+**/*.mp3
+**/*.png
+**/*.jpg
+**/*.jpeg

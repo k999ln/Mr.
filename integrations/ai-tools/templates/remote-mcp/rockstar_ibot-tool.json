@@ -1,0 +1,74 @@
+{
+  "$schema": "https://raw.githubusercontent.com/k999ln/Mr./main/integrations/ai-tools/rockstar_ibot-tool.schema.json",
+  "schemaVersion": 1,
+  "serverName": "io.rockstar-ibot.examples/remote-ai-tool",
+  "kind": "remote_tool",
+  "compatibility": {
+    "minimumCoreVersion": "1.0.0",
+    "surfaces": ["web", "ios", "core"]
+  },
+  "capabilities": [
+    {
+      "id": "summarize.public-text",
+      "title": "Public text summary",
+      "description": "Summarize owner-selected public text without publishing or changing external data.",
+      "inputDataClasses": ["public_text"],
+      "outputDataClasses": ["generated_content"],
+      "effect": "read",
+      "ownerApproval": "install",
+      "idempotencyRequired": true,
+      "receiptRequired": true
+    }
+  ],
+  "requestedPermissions": {
+    "dataRead": ["public_text"],
+    "dataWrite": ["generated_content"],
+    "credentialSlots": [
+      {
+        "id": "provider-api-key",
+        "purpose": "Authenticate the selected remote MCP provider through the credential broker.",
+        "required": true
+      }
+    ],
+    "network": [
+      {
+        "scheme": "https",
+        "host": "api.example.invalid",
+        "port": 443,
+        "methods": ["POST"]
+      }
+    ],
+    "storage": {
+      "retentionDays": 0,
+      "containsPersonalData": false
+    }
+  },
+  "runtime": {
+    "mode": "isolated_remote",
+    "timeoutMs": 30000,
+    "maxOutputBytes": 1048576,
+    "maxConcurrency": 2
+  },
+  "commercial": {
+    "mode": "free",
+    "requiresQuote": false
+  },
+  "receipts": {
+    "schemaVersion": 1,
+    "readback": "none",
+    "requiredFields": [
+      "receipt_id",
+      "run_id",
+      "server_name",
+      "version",
+      "package_digest",
+      "capability_id",
+      "grant_id",
+      "input_sha256",
+      "output_sha256",
+      "status",
+      "started_at",
+      "finished_at"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "source": "integrations/ai-tools/registry.json",
+  "executionEnabled": false,
+  "supportedPackageTypes": [
+    "remote-mcp",
+    "npm",
+    "pypi",
+    "cargo",
+    "oci",
+    "nuget",
+    "mcpb"
+  ],
+  "packages": [
+    {
+      "id": "io.life-manager.examples/remote-ai-tool@0.1.0",
+      "serverName": "io.life-manager.examples/remote-ai-tool",
+      "title": "Remote AI Tool Template",
+      "description": "Template-only remote MCP tool for package validation",
+      "version": "0.1.0",
+      "kind": "remote_tool",
+      "entryKind": "template",
+      "validationState": "schema_valid",
+      "publisherTrust": "publisher_unverified",
+      "runtimeState": "catalog_only",
+      "registryState": "catalog_only",
+      "signatureState": "not_required_template",
+      "publisherName": "Life Manager Examples",
+      "packageFormat": "remote-mcp",
+      "manifestSha256": "594656ef930d4f70679b753de7f94858eb6ba1e04ea7fdb583e198cf272775d4",
+      "capabilities": [
+        {
+          "id": "summarize.public-text",
+          "title": "Public text summary",
+          "description": "Summarize owner-selected public text without publishing or changing external data.",
+          "effect": "read",
+          "ownerApproval": "install"
+        }
+      ]
+    }
+  ]
+}

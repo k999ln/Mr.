@@ -1,0 +1,93 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "processed_threads", "processed_thread_ids", "processed_message_ids", "calendar_events", "replies", "assessments", "prep_packs", "verifications", "reports"],
+  "properties": {
+    "status": {"type": "string"},
+    "processed_threads": {"type": "integer"},
+    "processed_thread_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}
+    },
+    "processed_message_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}
+    },
+    "calendar_events": {"type": "array", "items": {"type": "string"}},
+    "replies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message_id", "status"],
+        "properties": {
+          "message_id": {"type": "string"},
+          "status": {
+            "enum": ["sent", "blocked", "route_scheduling", "delivery_unknown"]
+          }
+        }
+      }
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["assessment_id", "route", "state"],
+        "properties": {
+          "assessment_id": {"type": "string"},
+          "route": {
+            "enum": ["autonomous_allowed", "manual_integrity_gate"]
+          },
+          "state": {
+            "enum": [
+              "detected",
+              "policy_blocked",
+              "prepared",
+              "executing",
+              "execution_failed",
+              "verified",
+              "submit_claimed",
+              "submit_started",
+              "submitted",
+              "submit_unknown"
+            ]
+          }
+        }
+      }
+    },
+    "prep_packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["interview_key", "status"],
+        "properties": {
+          "interview_key": {"type": "string"},
+          "status": {
+            "enum": ["pending_generation", "generated", "sent", "delivery_unknown"]
+          }
+        }
+      }
+    },
+    "verifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message_id", "tenant", "url_sha256", "status"],
+        "properties": {
+          "message_id": {"type": "string"},
+          "tenant": {"type": "string"},
+          "url_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "status": {
+            "enum": ["opened", "navigation_unknown", "blocked", "duplicate"]
+          }
+        }
+      }
+    },
+    "reports": {"type": "array", "items": {"type": "string"}}
+  }
+}

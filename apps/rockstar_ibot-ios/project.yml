@@ -1,0 +1,90 @@
+name: RockstarIbot
+
+options:
+  bundleIdPrefix: invalid.rockstaribot
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - ja
+    - Base
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: targeted
+
+targets:
+  RockstarIbot:
+    type: application
+    platform: iOS
+    sources:
+      - path: RockstarIbot
+        excludes:
+          - Config
+    resources:
+      - path: RockstarIbot/Resources
+    configFiles:
+      Debug: RockstarIbot/Config/Debug.xcconfig
+      Release: RockstarIbot/Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: invalid.rockstaribot.app
+        PRODUCT_NAME: RockstarIbot
+        INFOPLIST_FILE: RockstarIbot/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+
+  RockstarIbotTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RockstarIbotTests
+    dependencies:
+      - target: RockstarIbot
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: invalid.rockstaribot.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  RockstarIbotUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: RockstarIbotUITests
+    dependencies:
+      - target: RockstarIbot
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: invalid.rockstaribot.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: RockstarIbot
+
+schemes:
+  RockstarIbot:
+    build:
+      targets:
+        RockstarIbot: all
+        RockstarIbotTests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - name: RockstarIbotTests
+        - name: RockstarIbotUITests
+    run:
+      config: Debug
+    archive:
+      config: Release

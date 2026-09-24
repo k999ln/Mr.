@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "templates": [
+    {
+      "key": "launch_offer",
+      "terminal_outcome": "offer_available_to_buy",
+      "required_input_refs": ["goal_ref", "offer_ref"],
+      "phases": [
+        {
+          "key": "checkout",
+          "duration_minutes": 30,
+          "required": true,
+          "depends_on": [],
+          "capabilities": ["payment.checkout.create", "payment.invoice.create"]
+        },
+        {
+          "key": "offer_page",
+          "duration_minutes": 25,
+          "required": false,
+          "depends_on": ["checkout"],
+          "capabilities": ["page.publish", "course.publish"]
+        },
+        {
+          "key": "announce",
+          "duration_minutes": 15,
+          "required": true,
+          "depends_on": ["checkout", "offer_page"],
+          "capabilities": ["social.thread.publish", "social.publish", "audience.broadcast", "campaign.send", "message.send"]
+        }
+      ]
+    },
+    {
+      "key": "recover_revenue",
+      "terminal_outcome": "customer_given_verified_recovery_path",
+      "required_input_refs": ["goal_ref", "order_ref", "customer_ref"],
+      "phases": [
+        {
+          "key": "verify_payment",
+          "duration_minutes": 10,
+          "required": true,
+          "depends_on": [],
+          "capabilities": ["payment.receipt.read"]
+        },
+        {
+          "key": "recovery_outreach",
+          "duration_minutes": 20,
+          "required": true,
+          "depends_on": ["verify_payment"],
+          "capabilities": ["campaign.send", "message.send", "audience.broadcast", "delivery.notify"]
+        }
+      ]
+    },
+    {
+      "key": "deliver_order",
+      "terminal_outcome": "paid_order_access_delivered_and_verifiable",
+      "required_input_refs": ["goal_ref", "order_ref", "delivery_ref"],
+      "phases": [
+        {
+          "key": "verify_payment",
+          "duration_minutes": 10,
+          "required": true,
+          "depends_on": [],
+          "capabilities": ["payment.receipt.read"]
+        },
+        {
+          "key": "fulfill",
+          "duration_minutes": 20,
+          "required": true,
+          "depends_on": ["verify_payment"],
+          "capabilities": ["learner.enroll", "license.issue", "member.invite", "knowledge.snapshot.import"]
+        },
+        {
+          "key": "delivery_notice",
+          "duration_minutes": 10,
+          "required": false,
+          "depends_on": ["fulfill"],
+          "capabilities": ["delivery.notify", "message.send", "campaign.send"]
+        }
+      ]
+    },
+    {
+      "key": "nurture_customer",
+      "terminal_outcome": "customer_received_next_relevant_value",
+      "required_input_refs": ["goal_ref", "customer_ref", "content_ref"],
+      "phases": [
+        {
+          "key": "customer_signal",
+          "duration_minutes": 10,
+          "required": false,
+          "depends_on": [],
+          "capabilities": ["completion.read", "member.status.read", "license.status.read", "payment.receipt.read"]
+        },
+        {
+          "key": "nurture",
+          "duration_minutes": 20,
+          "required": true,
+          "depends_on": ["customer_signal"],
+          "capabilities": ["campaign.send", "audience.broadcast", "message.send", "social.thread.publish", "social.publish", "member.access.manage"]
+        }
+      ]
+    }
+  ]
+}

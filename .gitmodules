@@ -1,0 +1,27 @@
+[submodule "vendor/commerce-upstreams/formance-ledger"]
+	path = vendor/commerce-upstreams/formance-ledger
+	url = https://github.com/formancehq/ledger.git
+[submodule "vendor/commerce-upstreams/temporal"]
+	path = vendor/commerce-upstreams/temporal
+	url = https://github.com/temporalio/temporal.git
+[submodule "vendor/commerce-upstreams/openfga"]
+	path = vendor/commerce-upstreams/openfga
+	url = https://github.com/openfga/openfga.git
+[submodule "vendor/commerce-upstreams/grammy"]
+	path = vendor/commerce-upstreams/grammy
+	url = https://github.com/grammyjs/grammY.git
+[submodule "vendor/commerce-upstreams/payload"]
+	path = vendor/commerce-upstreams/payload
+	url = https://github.com/payloadcms/payload.git
+[submodule "vendor/commerce-upstreams/growthbook"]
+	path = vendor/commerce-upstreams/growthbook
+	url = https://github.com/growthbook/growthbook.git
+[submodule "vendor/commerce-upstreams/casdoor"]
+	path = vendor/commerce-upstreams/casdoor
+	url = https://github.com/casdoor/casdoor.git
+[submodule "vendor/commerce-upstreams/chatwoot"]
+	path = vendor/commerce-upstreams/chatwoot
+	url = https://github.com/chatwoot/chatwoot.git
+[submodule "vendor/commerce-upstreams/medusa"]
+	path = vendor/commerce-upstreams/medusa
+	url = https://github.com/medusajs/medusa.git

@@ -1,0 +1,24 @@
+# SHA-256(rule NUL repo-relative-path NUL value), never the raw matched value.
+# These exact pre-existing path/value pairs are retained only with the disabled
+# legacy owner code. They are not approved Kai defaults. Any moved, changed, or
+# newly added value has a different fingerprint and fails the security gate.
+48ab9e1d9956657ace088a839fafc1121292566fee26ca7422eed21be160110c # jp_e164 apps/rockstar_ibot/lib/care-scan-wiring.test.js
+449136e36782ce2fcc6e30e8d1a80e3f615dee14cdcb45dc2da4fc7c6a6eb78c # jp_e164 apps/rockstar_ibot/lib/diet-scan-wiring.test.js
+efb220d2dae03e6ac5af3ae0d9f05dc062410e97f84a00e33823c8bf32fd1eb0 # jp_e164 apps/rockstar_ibot/lib/precepts-wiring.test.js
+9cf457cfb8ff17c08b18083fd9dc5c41cc547947f9f48e0eefb2d0bfbb252d5d # jp_e164 apps/rockstar_ibot/lib/user-selector.test.js
+b3d509786c5fed92ad041fecfb095e8d340c767341dd0dac3c66aa7a65715cbe # us_e164 apps/rockstar_ibot/lib/user-selector.test.js
+6d577262b694ffd44d4623028cf5b09d3cfae514b8ee7a60c9334e1506c8072c # us_e164 apps/rockstar_ibot/scripts/check-owner-tools.test.js
+f8ee8e1fa32d43b78d5aef173bf151ca1f32a3426a413c789255f9bb9618023f # jp_e164 apps/rockstar_ibot/test/wake-loop-isolation.test.js
+14305a8a36e069d984ef496312e84c132dba63e89c6486b80297b67738f6c0b4 # us_e164 docs/owner-tools-setup.ja.md
+1e08709f86435fc96609d3f759e9ac19472bf72df7dc6f2655f4a0210ddbb664 # personal_gmail runtime/agentmail/README.md
+bd07000d88fd462f81543dc9b4c34d97a426633720abcf037a093d65af850ca1 # personal_gmail runtime/agentmail/inboxes-hermes.ts
+869d959f625e17533e630e69991ee51e78ef1ee65809d8b23ff8c4c321d3b303 # personal_gmail runtime/agentmail/inboxes-hermes.ts
+3fbebf8e8d9aba987ad3d988618ed7318d8fa928f4c3278f74644836501f80ee # us_e164 services/x402-endpoint/server.ts
+8e0b2b0be402d72e885f6e47da669de21ff9d46b8b42c98a908562d0e89da975 # personal_gmail skills/earn/autohedge/run-autohedge.sh
+82b5f322ef3557f5f82770c7f6897dd6505ec0c3d041a96c3a0e90008d4cbefb # personal_gmail skills/earn/marketing-engine/provision_prompt.sh
+79bf5de07b95d1d046f1ef8eb849f70a109e82f97fe460ecdc7e4299dac7d3b1 # personal_gmail skills/writer-agent/scripts/install-opportunity-response-worker.sh
+40c20ee58bfe93569d2bd32a6086fca2b200c6ce2ee8696267183cb3d59fe148 # personal_gmail skills/writer-agent/scripts/opportunity_response.py
+4af6daa351cd0a5c8b69bf4a172e0a196d9668b4beac2cf653fb703cd06379d5 # personal_gmail skills/writer-agent/self-signup/SKILL.md
+673cf9f109cafc7ff51cd8c3f4516508ac0e5abbfad1cf3982de151338a85729 # personal_gmail skills/writer-agent/self-signup/scripts/gen-plus-address.sh
+6ac8e734239b6e1fcf94fac208ed075ac4a2c2969516d576e92936477d0ebc21 # personal_gmail skills/writer-agent/self-signup/scripts/gen-plus-address.sh
+86999b107404d827fd0cc766b6ce6d0fff9ab75f4ae41fdb17fd02501554b985 # jp_postal skills/writer-agent/tests/test_pii_gate.py

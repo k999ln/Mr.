@@ -1,0 +1,51 @@
+[
+  {
+    "application_id": "5e315cfd-33fc-433b-a5f0-3cfcdc27a9a4",
+    "gig_id": "2b410cad-7cc9-44fd-b2f1-843d9eae6c24",
+    "amount_usd": 1,
+    "payment_currency": "sol",
+    "merchant_wallet_address": "71FfqFniYoMsWZb1qFeQDb1fk2xqvajzivpsnMb44gTf",
+    "category": "code",
+    "pr_links": [
+      "https://github.com/profullstack/aiornot.vote/pull/100"
+    ],
+    "description": "RSS enclosure MIME fix"
+  },
+  {
+    "application_id": "f8960763-2d63-4a49-b004-65d9f2c61f2c",
+    "gig_id": "d9778d45-f0fc-46c7-a85f-710e20d928e2",
+    "amount_usd": 0.25,
+    "payment_currency": "sol",
+    "merchant_wallet_address": "71FfqFniYoMsWZb1qFeQDb1fk2xqvajzivpsnMb44gTf",
+    "category": "code",
+    "pr_links": [
+      "https://github.com/moshcoder/moshcode/pull/61"
+    ],
+    "description": "Portable skillName fallback test fix"
+  },
+  {
+    "application_id": "7e636f57-4d5a-4f54-b6d2-31ba1a86c5bd",
+    "gig_id": "1eea7af1-3089-443c-9975-74212c53683f",
+    "amount_usd": 0.25,
+    "payment_currency": "sol",
+    "merchant_wallet_address": "71FfqFniYoMsWZb1qFeQDb1fk2xqvajzivpsnMb44gTf",
+    "category": "marketing",
+    "proof_urls": [
+      "https://pairux.com/@moshcoding"
+    ],
+    "description": "Subscribed to the requested PairUX channel"
+  },
+  {
+    "application_id": "85654162-eabb-457f-af0e-ce647e8de0e2",
+    "gig_id": "174bfd02-a741-4d37-bf94-8529222dfe6e",
+    "amount_usd": 20,
+    "payment_currency": "sol",
+    "merchant_wallet_address": "71FfqFniYoMsWZb1qFeQDb1fk2xqvajzivpsnMb44gTf",
+    "category": "art",
+    "proof_urls": [
+      "https://github.com/profullstack/nightcell7/pull/38",
+      "https://github.com/Daisuke134/nightcell7/blob/feat/hex-cover/docs/portfolio/hex-cover.md"
+    ],
+    "description": "Original modular hex-armour tactical cover and Babylon.js integration"
+  }
+]

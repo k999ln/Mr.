@@ -1,0 +1,217 @@
+name: Security Scan
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  avocadomini-release:
+    name: avocadomini release contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: apps/rockstar_ibot/package-lock.json
+      - name: Install Core dependencies exactly
+        working-directory: apps/rockstar_ibot
+        run: npm ci --ignore-scripts
+      - name: Test all Core, Telegram, tenant, receipt, and workflow contracts
+        working-directory: apps/rockstar_ibot
+        run: npm test
+      - name: Block moderate, high, and critical production advisories
+        working-directory: apps/rockstar_ibot
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Verify owner boundary and legacy Vercel route
+        run: |
+          npm run test:oss
+          npm run owner:audit
+
+  avocadomini-site:
+    name: avocadomini site contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/doraemon-marketing-site/package-lock.json
+      - name: Install Site dependencies exactly
+        working-directory: apps/doraemon-marketing-site
+        run: npm ci --ignore-scripts
+      - name: Build and verify public Site
+        working-directory: apps/doraemon-marketing-site
+        run: npm test
+      - name: Require zero production dependency advisories
+        working-directory: apps/doraemon-marketing-site
+        run: npm audit --omit=dev --audit-level=low
+
+  context-drift:
+    name: Startup context drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify README, fundraising kit, and active form context
+        run: node --test test/startup-context.test.mjs test/startup-context-export.test.mjs skills/apply-to-funder/__tests__/context.test.mjs
+      - name: Verify canonical public links and product context digest
+        run: node scripts/startup-context/audit.mjs
+
+  oss-boundary:
+    name: OSS self-contained boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify canonical checkout has no external source dependency
+        run: node scripts/verify-oss-self-contained.mjs
+
+  ai-tool-contract:
+    name: AI tool and Product Hunt contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify package registry, shared catalogs, and discovery safety gates
+        run: |
+          node --check lib/producthunt-discovery.mjs
+          node --check scripts/ai-tool-package.mjs
+          npm run ai-tools:validate
+          npm run ai-tools:catalog -- --check
+          npm run test:ai-tools
+      - name: Compile Product Hunt Draft 2020-12 schemas
+        run: |
+          npx --yes --package ajv-cli@5.0.0 --package ajv-formats@3.0.1 ajv compile --spec=draft2020 -c ajv-formats -s integrations/ai-tools/discovery/producthunt-source.schema.json
+          npx --yes --package ajv-cli@5.0.0 --package ajv-formats@3.0.1 ajv validate --spec=draft2020 -c ajv-formats -s integrations/ai-tools/discovery/producthunt-source.schema.json -d integrations/ai-tools/discovery/producthunt-source.json
+          npx --yes --package ajv-cli@5.0.0 --package ajv-formats@3.0.1 ajv compile --spec=draft2020 -c ajv-formats -s integrations/ai-tools/discovery/producthunt-candidate-queue.schema.json
+          npx --yes --package ajv-cli@5.0.0 --package ajv-formats@3.0.1 ajv validate --spec=draft2020 -c ajv-formats -s integrations/ai-tools/discovery/producthunt-candidate-queue.schema.json -d test/fixtures/producthunt-candidate-queue.schema-valid.json
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          set -e
+          VERSION=8.30.1
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: gitleaks dir (= current merge result)
+        run: gitleaks dir . --config .gitleaks.toml --no-banner --redact -v
+
+      - name: gitleaks git (= full history with adjudicated fingerprint baseline)
+        run: gitleaks git . --config .gitleaks.toml --no-banner --redact -v --log-opts=--all
+
+  trufflehog:
+    name: TruffleHog (filesystem + git history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog filesystem
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --only-verified
+
+      - name: TruffleHog git history
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: HEAD
+          extra_args: --only-verified
+
+  shape-grep:
+    name: PII shapes (redacted exact-fingerprint gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Block accidental PII patterns
+        run: python3 scripts/security/pii_shape_scan.py --allowlist .pii-shape-allowlist --quarantine .pii-shape-quarantine .
+
+  python-lint:
+    name: Python syntax + unittest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: install exact test dependencies
+        run: python3 -m pip install --disable-pip-version-check -r requirements-ci.txt
+
+      - name: ast.parse every .py
+        run: |
+          set -e
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          excluded = {".git", "node_modules", ".venv", "venv"}
+          failures = []
+          for path in Path(".").rglob("*.py"):
+              if excluded.intersection(path.parts):
+                  continue
+              try:
+                  ast.parse(path.read_text(encoding="utf-8"))
+              except (SyntaxError, UnicodeDecodeError) as exc:
+                  failures.append(f"{path}: {exc}")
+          if failures:
+              raise SystemExit("\n".join(failures))
+          PY
+          echo "✅ syntax clean"
+
+      - name: run declared pure-stdlib security tests
+        run: |
+          set -euo pipefail
+          while IFS= read -r t; do
+            [[ -z "$t" || "$t" == \#* ]] && continue
+            test -f "$t"
+            echo "→ $t"
+            python3 "$t"
+          done < .github/python-security-tests.txt
+          echo "✅ declared security tests passed"
+
+  shell-lint:
+    name: Shell syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n every .sh
+        run: |
+          set -e
+          find . -name '*.sh' -not -path './.git/*' -exec bash -n {} \;
+          echo "✅ all .sh files parse"

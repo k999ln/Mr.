@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mr. automation hub inventory",
+  "description": "Display metadata only. Does not grant execution or replace integrations/ai-tools review.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "description", "tools"],
+  "properties": {
+    "$schema": {"const": "./tool-catalog.schema.json"},
+    "schemaVersion": {"const": 1},
+    "description": {"type": "string", "minLength": 1},
+    "tools": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/tool"}}
+  },
+  "$defs": {
+    "textList": {"type": "array", "uniqueItems": true, "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "tool": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "description", "origin", "version", "status", "sourcePaths", "permissions", "costModel", "surfaces", "requirements", "nextAction"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "origin": {"enum": ["builtin", "external"]},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+        "status": {"enum": ["runnable_local", "sign_in_required", "connection_required", "catalog_only"]},
+        "sourcePaths": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\)[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"}
+        },
+        "permissions": {"$ref": "#/$defs/textList"},
+        "costModel": {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "description"],
+          "properties": {
+            "mode": {"enum": ["included_local", "provider_usage", "not_connected"]},
+            "description": {"type": "string", "minLength": 1}
+          }
+        },
+        "surfaces": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["web", "desktop", "os", "telegram"]}},
+        "requirements": {"$ref": "#/$defs/textList"},
+        "nextAction": {"type": "string", "minLength": 1}
+      },
+      "allOf": [{
+        "if": {"properties": {"status": {"const": "runnable_local"}}},
+        "then": {"properties": {"origin": {"const": "builtin"}, "costModel": {"properties": {"mode": {"const": "included_local"}}}}}
+      }]
+    }
+  }
+}

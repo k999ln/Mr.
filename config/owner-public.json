@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-05",
+  "owner": {
+    "displayName": "Kai",
+    "githubLogin": "k999ln",
+    "githubOwnerChoice": "k999ln",
+    "githubOwnerStatus": "confirmed_by_user_and_connector",
+    "githubConnectorLogin": "k999ln",
+    "githubConnectorPermission": "admin",
+    "githubLocalCliLogin": "noellesugar99",
+    "githubLocalCliPermission": "write",
+    "githubPreviousCliLogin": "vng888del",
+    "githubCandidates": [
+      "k999ln",
+      "vng888del"
+    ]
+  },
+  "product": {
+    "name": "Rockstar_ibot",
+    "publicName": "avocadomini",
+    "publicNameStatus": "independent_public_brand_selected",
+    "companyName": null
+  },
+  "links": {
+    "repository": "https://github.com/k999ln/Mr.",
+    "repositoryPlanned": "https://github.com/k999ln/Mr.",
+    "repositoryStatus": "verified_private_owner_write",
+    "repositoryCandidates": [
+      {
+        "url": "https://github.com/k999ln/Mr.",
+        "status": "verified_private_owner_write"
+      },
+      {
+        "url": "https://github.com/vng888del/life-manager",
+        "status": "not_found"
+      }
+    ],
+    "localOrigin": "https://github.com/k999ln/Mr..git",
+    "localOriginStatus": "verified_target_owner_write",
+    "hub": "https://life-manager-one-hub.kirin-999.chatgpt.site",
+    "canonicalWeb": "https://effect-os-verified.kirin-999.chatgpt.site",
+    "web": "https://doraos.vercel.app",
+    "webStatus": "verified_public_compatibility_redirect_to_codex_sites",
+    "core": "https://avocadomini-core-production.up.railway.app"
+  },
+  "telegram": {
+    "mode": "byob_single",
+    "displayName": "avocadomini",
+    "botUsername": "avocadominibot",
+    "botStatus": "verified_webhook_token_rotation_and_e2e_pending"
+  },
+  "contact": {
+    "publicEmail": null,
+    "replyDomain": null
+  },
+  "social": {
+    "x": "https://x.com/doraemonbottt",
+    "instagram": null,
+    "tiktok": null,
+    "youtube": null,
+    "note": null,
+    "substack": null,
+    "zenn": null
+  },
+  "money": {
+    "publicWallet": null,
+    "stripePaymentLink": "https://buy.stripe.com/4gMaEX2OK1yo4GX144c7u00"
+  }
+}

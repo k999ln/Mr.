@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-05",
+  "status": "quarantined",
+  "defaultActivation": false,
+  "categories": [
+    {
+      "id": "historical-docs-and-receipts",
+      "paths": ["docs/evidence/**", "docs/superpowers/**", "specs/**", ".vcsdd/**"],
+      "policy": "read_only_history",
+      "reason": "Links and receipts identify the former operator and must not be rewritten as Kai's evidence."
+    },
+    {
+      "id": "legacy-autonomous-runtime",
+      "paths": ["runtime/**", "control-room/**", "skills/self/**", "skills/report/**"],
+      "policy": "disabled_until_owner_adapter_rebuild",
+      "reason": "Old cloud, mail, telemetry, and self-spawn assumptions are not part of the current Core/Hub/Cell design."
+    },
+    {
+      "id": "legacy-earn-and-money",
+      "paths": ["skills/earn/**", "skills/economy/**", "services/x402-endpoint/**"],
+      "policy": "no_money_effect_without_explicit_kai_wallet",
+      "reason": "Historical wallets and ledgers are not Kai-owned. Current entrypoints must require LIFE_MANAGER_PAY_TO or X402_PAYTO."
+    },
+    {
+      "id": "legacy-social-publication",
+      "paths": ["skills/affiliate/**", "skills/writer-agent/**", "apps/rockstar_ibot/scripts/anicca-*.js", "apps/rockstar_ibot/scripts/honne-*.js"],
+      "policy": "publish_blocked_by_code",
+      "reason": "Former social handles, Postiz integrations, and artifact approvals cannot be transferred by changing labels."
+    },
+    {
+      "id": "legacy-marketplace-receipts",
+      "paths": ["apps/rockstar_ibot/scripts/ugig-deliveries.json"],
+      "policy": "historical_only",
+      "reason": "Delivery URLs and marketplace identities belong to their original receipts."
+    }
+  ]
+}

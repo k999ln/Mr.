@@ -1,0 +1,214 @@
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest import mock
+from pathlib import Path
+
+from runtime.loop.loop_cleanup import cleanup_run_root, gc_releases
+from runtime.loop.lm_loop_run import prepare_loop_run
+from runtime.loop.runtime_event import validate_runtime_event
+from runtime.loop.central_cleanup import loaded_release_roots, release_gc
+from runtime.loop.central_cleanup import host_cleanup_command
+
+
+def completed(root: Path, name: str, size: int = 1) -> Path:
+    run = root / "runs" / name; run.mkdir(parents=True)
+    (run / ".lm-regenerable").write_text("1\n")
+    (run / "summary.json").write_text("{}\n")
+    (run / "payload.bin").write_bytes(b"x" * size)
+    return run
+
+
+class LoopCleanupTest(unittest.TestCase):
+    def test_host_cleanup_uses_durable_shared_pressure_state(self):
+        command = host_cleanup_command(Path('/release'), Path('/home'))
+        self.assertEqual(command[-4:], ['--home', '/home', '--state-dir', '/home/.local/state/rockstar_ibot'])
+    def test_loop_cleanup_preserves_active_unmarked_and_receipts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); old = completed(root, "old"); active = completed(root, "active")
+            newest = completed(root, "newest")
+            unmarked = root / "runs/unmarked"; unmarked.mkdir(); (unmarked / "data").write_text("keep")
+            receipt = root / "receipts"; receipt.mkdir(); (receipt / "official.json").write_text("keep")
+            for index, path in enumerate((old, active, newest), 1): os.utime(path, (index, index))
+            result = cleanup_run_root(root, {"max_runs": 1, "max_age_days": 365}, {"active"}, now=4)
+            self.assertFalse(old.exists())
+            self.assertTrue(active.exists())
+            self.assertTrue(newest.exists())
+            self.assertTrue(unmarked.exists())
+            self.assertTrue(receipt.exists())
+            self.assertEqual(result["protected_deletions"], 0)
+
+    def test_pressure_cleanup_reclaims_completed_bytes_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); completed(root, "old", 1024 * 1024)
+            result = cleanup_run_root(root, {"max_runs": 0, "max_age_days": 1}, set(), now=time.time() + 172800)
+            self.assertGreaterEqual(result["reclaimed_bytes"], 1024 * 1024)
+            self.assertEqual(result["removed_runs"], 1)
+
+    def test_release_gc_preserves_current_and_explicit_protected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            releases = Path(directory) / "releases"; releases.mkdir()
+            paths=[]
+            for index in range(4):
+                path=releases/f"2026010{index}T000000-{'a'*7}{index}"; path.mkdir()
+                (path/"RELEASE.json").write_text(json.dumps({"sha": f"{index:040x}"}))
+                os.utime(path,(index,index)); paths.append(path)
+            current=Path(directory)/"current"; current.symlink_to(paths[1])
+            result=gc_releases(releases,current,keep=1,protected={paths[2].resolve()})
+            self.assertTrue(paths[1].exists()); self.assertTrue(paths[2].exists()); self.assertTrue(paths[3].exists())
+            self.assertFalse(paths[0].exists())
+            self.assertEqual(result["protected_deletions"],0)
+
+    def test_release_gc_removes_selected_read_only_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            releases = Path(directory) / "releases"; releases.mkdir()
+            stale = releases / ("20260101T000000-" + "a" * 8); stale.mkdir()
+            (stale / "RELEASE.json").write_text(json.dumps({"sha": "a" * 40}))
+            nested = stale / "nested"; nested.mkdir(); (nested / "code.py").write_text("x")
+            for path in (nested / "code.py", stale / "RELEASE.json"):
+                path.chmod(0o444)
+            nested.chmod(0o555); stale.chmod(0o555)
+            current = Path(directory) / "current"
+
+            result = gc_releases(releases, current, keep=0, protected=set())
+
+            self.assertFalse(stale.exists())
+            self.assertEqual(result["errors"], 0)
+
+    def test_loop_run_cleans_only_its_root_then_returns_exact_release_argv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); entry=root/'bin/job.sh'; entry.parent.mkdir(); entry.write_text('#!/bin/sh\n'); entry.chmod(0o755)
+            state=root/'home/state'; completed(state,'old',128)
+            registry={"schema_version":2,"loops":{"job":{
+                "label":"ai.anicca.job","domain":"system","entrypoint":"bin/job.sh",
+                "cadence":{"run_at_load":True},"effect_class":"none",
+                "state_root":"~/state","log_root":"~/state/logs",
+                "cleanup":{"max_runs":1,"max_age_days":1},"provider_route":"deterministic"}}}
+            with mock.patch.dict(os.environ,{"HOME":str(root/'home')}):
+                argv,receipt=prepare_loop_run(registry,"job",root,active_run_ids=set(),now=time.time()+172800)
+            self.assertEqual(argv,[str(entry.resolve())])
+            self.assertFalse((state/'runs/old').exists())
+            self.assertGreaterEqual(receipt['reclaimed_bytes'],128)
+
+    def test_loaded_plist_release_is_discovered_as_protected(self):
+        import plistlib
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); releases=root/'releases'; release=releases/('20260101T000000-'+'a'*8)
+            entry=release/'bin/job.sh'; entry.parent.mkdir(parents=True); entry.write_text('x')
+            agents=root/'agents'; agents.mkdir()
+            (agents/'ai.anicca.job.plist').write_bytes(plistlib.dumps({
+                'Label':'ai.anicca.job','ProgramArguments':[str(entry)]}))
+            self.assertEqual(loaded_release_roots(agents,releases),{release.resolve()})
+
+    def _run_terminal_event(self, exit_code: int) -> dict:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); home = root / "home"; home.mkdir()
+            entry = root / "bin/job.sh"; entry.parent.mkdir()
+            entry.write_text(f"#!/bin/sh\nexit {exit_code}\n"); entry.chmod(0o755)
+            registry = {"schema_version": 2, "loops": {"job": {
+                "label": "ai.anicca.job", "domain": "system", "entrypoint": "bin/job.sh",
+                "cadence": {"run_at_load": True}, "effect_class": "none",
+                "state_root": "~/state", "log_root": "~/state/logs",
+                "cleanup": {"max_runs": 1, "max_age_days": 1},
+                "provider_route": "deterministic"}}}
+            (root / "config").mkdir(); (root / "config/loop-registry.json").write_text(json.dumps(registry))
+            (root / "config/legacy-owner-quarantine.json").write_text(json.dumps({"defaultActivation": True}))
+            (root / "config/owner-runtime-policy.json").write_text(json.dumps({
+                "owner": {"displayName": "Kai", "githubLogin": "k999ln"},
+                "canonicalRepository": "https://github.com/k999ln/Mr.",
+                "mode": "autonomous",
+                "autonomousRuntimeActivation": True,
+                "allowedLiveSlots": [],
+            }))
+            (root / "config/owner-public.json").write_text(json.dumps({
+                "owner": {"githubLogin": "k999ln"},
+                "links": {"repository": "https://github.com/k999ln/Mr."},
+            }))
+            (root / "skills").mkdir()
+            (root / "skills/registry.json").write_text(json.dumps({"slots": {}}))
+            (root / "RELEASE.json").write_text(json.dumps({"sha": "a" * 40}))
+            result = subprocess.run(
+                [sys.executable, "-m", "runtime.loop.lm_loop_run", "job", str(root)],
+                cwd=Path(__file__).parents[3], env={**os.environ, "HOME": str(home)}, check=False)
+            self.assertEqual(result.returncode, exit_code)
+            event = json.loads((home / "state/events.jsonl").read_text().splitlines()[-1])
+            return validate_runtime_event(event)
+
+    def test_loop_run_records_success_terminal_event(self):
+        event = self._run_terminal_event(0)
+        self.assertEqual((event["status"], event["release_sha"], event["provider"]),
+                         ("pass", "a" * 40, "deterministic"))
+        self.assertEqual(event["effect_status"], "not_applicable")
+        self.assertTrue(event["evidence_refs"][0].startswith("lm-loop://job/"))
+
+    def test_loop_run_records_failed_terminal_event(self):
+        event = self._run_terminal_event(7)
+        self.assertEqual((event["status"], event["blocker"]),
+                         ("fail", "entrypoint_exit_7"))
+
+    def test_release_gc_preserves_release_loaded_by_launchd(self):
+        import plistlib
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); releases=root/'releases'; releases.mkdir()
+            paths=[]
+            for index in range(4):
+                path=releases/f"2026010{index}T000000-{'a'*7}{index}"; path.mkdir()
+                (path/'RELEASE.json').write_text(json.dumps({'sha':f'{index:040x}'}))
+                os.utime(path,(index,index)); paths.append(path)
+            entry=paths[0]/'bin/lm-loop-run'; entry.parent.mkdir(); entry.write_text('#!/bin/sh\n')
+            current=root/'current'; current.symlink_to(paths[3])
+            agents=root/'agents'; agents.mkdir()
+            (agents/'ai.anicca.job.plist').write_bytes(plistlib.dumps({
+                'Label':'ai.anicca.job',
+                'ProgramArguments':[str(paths[0]/'bin/lm-loop-run')],
+            }))
+            result=release_gc(releases,current,agents,keep=1)
+            self.assertTrue(paths[0].exists())
+            self.assertFalse(paths[1].exists())
+            self.assertTrue(paths[3].exists())
+            self.assertEqual(result['protected_release_count'],1)
+
+    def test_release_gc_preserves_release_used_by_open_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); releases = root / "releases"; releases.mkdir()
+            paths = []
+            for index in range(4):
+                path = releases / f"2026010{index}T000000-{'a' * 7}{index}"
+                path.mkdir(); (path / "RELEASE.json").write_text(json.dumps({"sha": f"{index:040x}"}))
+                os.utime(path, (index, index)); paths.append(path)
+            current = root / "current"; current.symlink_to(paths[3])
+            agents = root / "agents"; agents.mkdir()
+            with mock.patch(
+                "runtime.loop.central_cleanup.open_release_roots",
+                return_value={paths[0].resolve()},
+            ):
+                result = release_gc(releases, current, agents, keep=1)
+            self.assertTrue(paths[0].exists())
+            self.assertFalse(paths[1].exists())
+            self.assertTrue(paths[2].exists())
+            self.assertTrue(paths[3].exists())
+            self.assertEqual(result["protected_release_count"], 1)
+
+    def test_release_gc_ignores_explicit_paths_outside_the_target_release_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            releases = root / "releases"; releases.mkdir()
+            current_release = releases / ("20260101T000000-" + "a" * 8)
+            current_release.mkdir(); (current_release / "RELEASE.json").write_text("{}")
+            current = root / "current"; current.symlink_to(current_release)
+            agents = root / "agents"; agents.mkdir()
+            unrelated = root / "other-release"; unrelated.mkdir()
+            protected_file = root / "protected.json"
+            protected_file.write_text(json.dumps([str(unrelated)]))
+
+            with mock.patch.dict(os.environ, {"LIFE_MANAGER_PROTECTED_RELEASES": str(protected_file)}):
+                result = release_gc(releases, current, agents, keep=1)
+
+            self.assertEqual(result["protected_release_count"], 0)
+            self.assertTrue(current_release.exists())
+
+if __name__ == "__main__": unittest.main()

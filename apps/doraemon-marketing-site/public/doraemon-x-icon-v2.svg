@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">avocadomini 自動化ポータル</title>
+  <desc id="description">青い背景に、すべてを一つへまとめる白いポータルと黄色い起動点</desc>
+  <rect width="1024" height="1024" rx="224" fill="#0866F5"/>
+  <path
+    d="M278 640C278 410 380 285 512 285C644 285 746 410 746 640C672 640 594 700 512 765C430 700 352 640 278 640ZM354 603C354 452 420 361 512 361C604 361 670 452 670 603C615 619 560 661 512 701C464 661 409 619 354 603Z"
+    fill="#FFFFFF"
+    fill-rule="evenodd"
+  />
+  <circle cx="512" cy="523" r="54" fill="#FFD43B"/>
+</svg>

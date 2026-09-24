@@ -1,0 +1,12 @@
+export const EXECUTION_PROTOCOL: string;
+export const HEARTBEAT_MS: number;
+export const LEASE_MS: number;
+export const MAX_RESULT_BYTES: number;
+export type ExecutionResult = { title: string; body: string; checks: string[]; warnings: string[] };
+export type ExecutionJob = { id: string; claimToken: string; slotId: string; cellId: string; summary: string; attachment?: string | null };
+export type ExecutionDeviceState = { paired: boolean; ready: boolean; lastSeenAt: string | null };
+export const executionCells: ReadonlyArray<{ slotId: string; cellId: string; instruction: string }>;
+export const executionResultSchema: Record<string, unknown>;
+export function validateExecutionResult(value: unknown): ExecutionResult;
+export function executionPrompt(job: Pick<ExecutionJob, 'slotId' | 'cellId' | 'summary' | 'attachment'>): string;
+export function deviceReady(device: { protocol: string; heartbeatAt: number; verified: boolean } | null, now?: number): boolean;

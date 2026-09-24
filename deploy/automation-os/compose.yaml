@@ -1,0 +1,17 @@
+services:
+  runner:
+    build:
+      context: ../..
+      dockerfile: deploy/automation-os/Dockerfile
+    user: "1000:1000"
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.50
+    restart: "no"
+    stdin_open: true
+    command: ["--stdio"]

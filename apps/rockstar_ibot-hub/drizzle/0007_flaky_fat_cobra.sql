@@ -1,0 +1,1 @@
+ALTER TABLE `portfolio_mutation_receipts` ADD `claim_token` text DEFAULT '' NOT NULL;

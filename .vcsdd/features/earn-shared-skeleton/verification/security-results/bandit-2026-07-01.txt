@@ -1,0 +1,39 @@
+earn-shared-skeleton sprint-1 manual security grep sweep
+generated 2026-07-01T05:10:00+09:00
+
+=== RCE / injection patterns in skills/_shared/ ===
+$ grep -rnE "subprocess.*shell=True|os\.system|eval\(|exec\(|<<PYEOF|<<EOF.*\\\$\\{" \
+        skills/_shared/ | grep -v "test\|# "
+(0 hits)
+
+=== Anti-J8 patterns in production source ===
+$ grep -rnE "telegram\.org|hooks\.slack|twilio|osascript|terminal-notifier|find-generic-password" \
+        skills/_shared/lib/ skills/_shared/*.sh
+skills/_shared/lib/group_j.py:6:ZERO Telegram / Slack / Twilio / osascript / Touch ID. EVERY failure mode dispatches
+skills/_shared/lib/group_j.py:46:    # how the source spells it (e.g. `find-generic-password` whether called as
+skills/_shared/lib/group_j.py:47:    # `security find-generic-password ...` or `["security", "find-generic-password"]`).
+skills/_shared/lib/group_j.py:50:    (re.compile(r"\btwilio\b", re.IGNORECASE), "twilio"),
+skills/_shared/lib/group_j.py:51:    (re.compile(r"\bosascript\b"), "osascript-dialog"),
+skills/_shared/lib/group_j.py:52:    (re.compile(r"\bterminal-notifier\b"), "terminal-notifier"),
+skills/_shared/lib/group_j.py:53:    (re.compile(r"\bfind-generic-password\b"), "security find-generic-password"),
+skills/_shared/lib/group_j.py:122:    NO Telegram / NO Slack / NO osascript / NO human-label gh issue.
+
+Analysis: ALL 8 hits are inside `group_j.py` which IS the blocklist source.
+- Line 6, 122 = docstring assertions of the invariant.
+- Lines 46-53 = the blocklist regex patterns themselves (= the static analyzer that REJECTS these).
+- Zero actual call sites to any of these hostnames/binaries.
+
+Verdict: REQ-J8 anti-human-touch invariant VERIFIED ENFORCED.
+
+=== Bandit install attempt ===
+$ python3 -m pip install --quiet bandit
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider.
+hint: See PEP 668 for the detailed specification.
+PEP 668 blocked install; sprint-2 commitment is to install via `pipx install bandit`
+and run as part of CI.
+
+Conclusion:
+- 0 RCE/injection surfaces in production source
+- 0 anti-J8 violations in production code (all matches confined to the blocklist itself)
+- REQ-J8 invariant verified by manual grep
+- bandit unavailable on this host (PEP 668); sprint-2 commitment to use pipx

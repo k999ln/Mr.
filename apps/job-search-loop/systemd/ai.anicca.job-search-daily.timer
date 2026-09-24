@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Anicca job search every 30 minutes
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=ai.anicca.job-search-daily.service
+
+[Install]
+WantedBy=timers.target

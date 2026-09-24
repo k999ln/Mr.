@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "connectors": [
+    {
+      "key": "telegram",
+      "name": "Telegram",
+      "capabilities": [
+        "message.send",
+        "message.receive",
+        "audience.broadcast",
+        "delivery.notify"
+      ],
+      "effect_class": "message",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "limited",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Selection and connection evidence are modeled, but no commerce.workflow Telegram adapter is registered in the runtime yet."
+      },
+      "limitations": [
+        "A selected tool does not create or authorize a bot connection by itself."
+      ]
+    },
+    {
+      "key": "x",
+      "name": "X",
+      "capabilities": [
+        "social.publish",
+        "social.thread.publish",
+        "social.metrics.read"
+      ],
+      "effect_class": "publish",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "limited",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Selection is supported, but production publishing depends on a separately configured X provider adapter and account permissions."
+      },
+      "limitations": [
+        "API access level and posting or analytics permissions vary by the connected X account."
+      ]
+    },
+    {
+      "key": "telegram-stars",
+      "name": "Telegram Stars",
+      "capabilities": [
+        "payment.invoice.create",
+        "payment.receipt.read",
+        "payment.refund"
+      ],
+      "effect_class": "money",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "limited",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Catalog and entitlement support are present; a production Stars payment adapter is not included in this foundation."
+      },
+      "limitations": [
+        "Telegram Stars is for Telegram digital goods and services and is not a general-purpose card processor.",
+        "Settlement, refund, and dispute behavior remains subject to Telegram platform rules."
+      ]
+    },
+    {
+      "key": "stripe",
+      "name": "Stripe",
+      "capabilities": [
+        "payment.checkout.create",
+        "payment.receipt.read",
+        "subscription.manage",
+        "payment.refund"
+      ],
+      "effect_class": "money",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "limited",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Rockstar_ibot has Stripe billing primitives, but merchant commerce execution requires separate account connection and adapter wiring."
+      },
+      "limitations": [
+        "Selection does not create products, prices, tax configuration, or a merchant account."
+      ]
+    },
+    {
+      "key": "email",
+      "name": "Email",
+      "capabilities": [
+        "message.send",
+        "campaign.send",
+        "delivery.receipt.read"
+      ],
+      "effect_class": "message",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "limited",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Transport primitives exist, while production commerce campaigns require a tenant sender connection, consent controls, and adapter wiring."
+      },
+      "limitations": [
+        "The connector does not establish recipient consent or guarantee inbox delivery."
+      ]
+    },
+    {
+      "key": "landing-page",
+      "name": "Landing Page",
+      "capabilities": [
+        "page.draft",
+        "page.publish",
+        "page.analytics.read"
+      ],
+      "effect_class": "publish",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "managed_reference",
+      "availability": {
+        "status": "planned",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Entitlement can be selected now; managed hosting and publication adapters are not part of this foundation."
+      },
+      "limitations": [
+        "Selection does not provision hosting, a domain, analytics, or a deployment target."
+      ]
+    },
+    {
+      "key": "lms",
+      "name": "LMS",
+      "capabilities": [
+        "course.publish",
+        "learner.enroll",
+        "completion.read"
+      ],
+      "effect_class": "publish",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "planned",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "The catalog reserves a generic LMS boundary; no vendor-specific production adapter is included."
+      },
+      "limitations": [
+        "Course, enrollment, and completion semantics differ by LMS and require a vendor-specific adapter."
+      ]
+    },
+    {
+      "key": "software-license",
+      "name": "Software License",
+      "capabilities": [
+        "license.issue",
+        "license.status.read",
+        "license.revoke"
+      ],
+      "effect_class": "publish",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "planned",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "Selection is modeled, but license generation, signing, activation, and revocation require a provider adapter."
+      },
+      "limitations": [
+        "This foundation does not generate or retain license-signing material."
+      ]
+    },
+    {
+      "key": "community",
+      "name": "Community",
+      "capabilities": [
+        "member.invite",
+        "member.access.manage",
+        "member.status.read"
+      ],
+      "effect_class": "publish",
+      "approval_required": true,
+      "readback_required": true,
+      "setup_mode": "credential_reference",
+      "availability": {
+        "status": "planned",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "The connector boundary is vendor-neutral; no Discord, Slack, Circle, or other community adapter is selected here."
+      },
+      "limitations": [
+        "Membership roles and access semantics require a provider-specific adapter."
+      ]
+    },
+    {
+      "key": "brain-import",
+      "name": "Brain Import",
+      "capabilities": [
+        "knowledge.snapshot.import",
+        "knowledge.provenance.read"
+      ],
+      "effect_class": "none",
+      "approval_required": false,
+      "readback_required": false,
+      "setup_mode": "artifact_reference",
+      "availability": {
+        "status": "planned",
+        "selectable": true,
+        "runtime_ready": false,
+        "note": "This release defines selection and metadata only; it does not include an importer."
+      },
+      "limitations": [
+        "Only an explicitly supplied export artifact may be imported; there is no live account scraping.",
+        "No continuous sync, merge conflict resolution, provider writeback, or complete-fidelity guarantee is provided.",
+        "An imported snapshot is untrusted source material until provenance and format validation succeed."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+import { NextResponse } from 'next/server';
+import { getChatGPTUser } from '../../../chatgpt-auth';
+import { authenticatedMutation } from '../../../lib/api-guard';
+import {
+  CoreConnectionError,
+  createCoreMailConnection,
+  readCoreMail,
+} from '../../../lib/core-client';
+
+function errorResponse(error: unknown) {
+  if (error instanceof CoreConnectionError) {
+    const messages: Record<string, string> = {
+      core_not_configured: 'Cloudflare Coreの接続設定が未完了です。',
+      core_unavailable: 'Cloudflare Coreへ接続できませんでした。',
+      identity_not_linked: '先にavocadomini Botの本人リンクを完了してください。',
+      mail_provider_unconfigured: 'Gmail接続サービスがまだ設定されていません。',
+      mail_provider_unavailable: 'Gmail接続サービスへ接続できませんでした。',
+      mail_provider_invalid_response: 'Gmail接続サービスの応答を確認できませんでした。',
+      mail_connection_attempt_expired: 'Gmail接続リンクの期限が切れました。もう一度開始してください。',
+      mail_account_conflict: 'このGmailは別の本人アカウントに接続済みです。',
+    };
+    return NextResponse.json(
+      { error: messages[error.code] || 'Gmail接続を開始できませんでした。' },
+      { status: error.httpStatus, headers: { 'cache-control': 'no-store' } },
+    );
+  }
+  console.error('[core-mail]', error);
+  return NextResponse.json(
+    { error: 'Gmail接続を開始できませんでした。' },
+    { status: 500, headers: { 'cache-control': 'no-store' } },
+  );
+}
+
+export async function GET() {
+  const user = await getChatGPTUser();
+  if (!user) return NextResponse.json({ error: '認証が必要です。' }, { status: 401 });
+  try {
+    return NextResponse.json(await readCoreMail(user.userId), { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function POST(request: Request) {
+  const auth = await authenticatedMutation(request);
+  if ('response' in auth) return auth.response;
+  const requestId = request.headers.get('idempotency-key') || '';
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(requestId)) {
+    return NextResponse.json(
+      { error: '安全な再試行キーが必要です。' },
+      { status: 400, headers: { 'cache-control': 'no-store' } },
+    );
+  }
+  try {
+    const result = await createCoreMailConnection(auth.user.userId, requestId);
+    return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

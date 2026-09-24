@@ -1,0 +1,1 @@
+SUPERSEDED: use `.claude/handovers/2026-08-16_2040_connector-core-recovery_goal.txt`.

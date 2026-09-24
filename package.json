@@ -1,0 +1,46 @@
+{
+  "name": "rockstar_ibot",
+  "private": true,
+  "scripts": {
+    "hub:sync": "node scripts/sync-automation-hub.mjs",
+    "hub:check": "node scripts/sync-automation-hub.mjs --check",
+    "hub:draft": "node services/automation-runner/cli.mjs draft",
+    "hub:runner": "node services/automation-runner/cli.mjs serve",
+    "test:automation-hub": "node --test test/automation-hub*.test.mjs services/automation-runner/test/runner.test.mjs",
+    "ai-tools:scaffold": "node scripts/ai-tool-package.mjs scaffold",
+    "ai-tools:validate": "node scripts/ai-tool-package.mjs validate",
+    "ai-tools:catalog": "node scripts/ai-tool-package.mjs catalog",
+    "ai-tools:discover:producthunt": "node scripts/ai-tool-package.mjs discover-producthunt",
+    "owner:check": "node apps/rockstar_ibot/scripts/check-owner-tools.js",
+    "marketing:check": "node scripts/check-doraemon-marketing.mjs",
+    "owner:audit": "node scripts/audit-owner-boundary.mjs",
+    "readme:hourly-sync": "node scripts/update-readme-hourly.mjs",
+    "telegram:configure": "node apps/rockstar_ibot/scripts/configure-telegram.js",
+    "test:ai-tools": "node --test test/ai-tool-package.test.mjs",
+    "audit:startup-context": "node scripts/startup-context/audit.mjs",
+    "build:fundraising-kit": "node scripts/startup-context/build-kit.mjs",
+    "preview:funder": "node skills/apply-to-funder/preview.mjs",
+    "site-ui:sync": "node packages/site-ui/sync.mjs apps/dora-launch-blueprint-site apps/mcp-bot-hub-patent-site",
+    "test:install": "node --test test/install-isolation.test.mjs",
+    "test:hourly-readme-sync": "node --test test/hourly-readme-sync.test.mjs",
+    "test:oss": "node --test test/oss-self-contained.test.mjs test/vercel-proxy.test.mjs test/deployment-workflows.test.mjs",
+    "verify:oss": "node scripts/verify-oss-self-contained.mjs"
+  },
+  "dependencies": {
+    "@blockrun/llm": "^3.13.6",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "5.0.0",
+    "playwright-core": "1.59.0-alpha-1771104257000",
+    "viem": "^2.56.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "fast-check": "^4.8.0"
+  },
+  "overrides": {
+    "jayson": {
+      "uuid": "11.1.1"
+    }
+  }
+}

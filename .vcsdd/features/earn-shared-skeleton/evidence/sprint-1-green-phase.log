@@ -1,0 +1,14 @@
+target-feature-tests: PASS
+regression-baseline: PASS
+total-tests: 142
+passing: 142
+failing: 0
+duration_s: 0.08
+phase: 2c-post-refactor
+
+# Phase 2c (refactor) complete. 142/142 still green after extracting common helpers.
+# New: lib/_common.py with is_verdict_pass + sha256_file + append_jsonl.
+# Touched: lib/proposal_loop.py (use is_verdict_pass + append_jsonl),
+#          lib/deliverable_loop.py (use is_verdict_pass + sha256_file + append_jsonl),
+#          lib/spawn_pin.py (re-export sha256_file from _common).
+# No behavior change. No spec change. Pure refactor.

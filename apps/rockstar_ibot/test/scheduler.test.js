@@ -1,0 +1,53 @@
+"use strict";
+const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
+const { test } = require("node:test");
+process.env.LM_CALL_SECRET = "unit_secret";
+
+test("scheduler helper-skip and signed streamUrl contract", () => {
+  const { isHelperBlock, buildStreamUrl } = require("../scheduler.js");
+  assert.strictEqual(isHelperBlock("[Travel] [APPLIED] x"), true);
+  assert.strictEqual(isHelperBlock("🎤 [PENDING] y"), true);
+  assert.strictEqual(isHelperBlock("Dentist"), false);
+  process.env.PUBLIC_WSS = "wss://life-call.up.railway.app";
+  const u = buildStreamUrl({ summary: "Dentist & Co", startIso: "2026-06-18T20:40:00+09:00", location: "Tokyo" }, "firm");
+  const p = new URL(u);
+  assert.strictEqual(p.pathname, "/ws");
+  assert.ok(p.searchParams.get("sig"), "must carry an HMAC sig");
+  assert.strictEqual(p.searchParams.get("urgency"), "firm");
+});
+
+test("late tick scheduler surface has no mail sender dependency", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../scheduler.js"), "utf8");
+  assert.doesNotMatch(source, /require\(["']\.\/lib\/notify\.js["']\)/);
+  const start = source.indexOf("async function lateNoticeUserOnce");
+  const end = source.indexOf("\n// ── Per-user single-invocation functions", start);
+  assert.ok(start >= 0 && end > start, "lateNoticeUserOnce source boundary must remain discoverable");
+  const lateTickSource = source.slice(start, end);
+  assert.doesNotMatch(lateTickSource, /sendLateNotice|noticeOpts|RESEND_API_KEY/);
+});
+
+test("Telegram onboarding scheduler sends nothing without this installation's HTTPS origin", async () => {
+  const keys = ["LM_TELEGRAM_BOT_TOKEN", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "LM_PUBLIC_URL", "RAILWAY_PUBLIC_DOMAIN"];
+  const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const originalFetch = global.fetch;
+  let calls = 0;
+  try {
+    process.env.LM_TELEGRAM_BOT_TOKEN = "fixture-token";
+    process.env.SUPABASE_URL = "https://fixture.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "fixture-service";
+    delete process.env.LM_PUBLIC_URL;
+    delete process.env.RAILWAY_PUBLIC_DOMAIN;
+    global.fetch = async () => { calls++; throw new Error("unexpected network access"); };
+    const { onboardTick } = require("../scheduler.js");
+    assert.equal(await onboardTick(), undefined);
+    assert.equal(calls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});

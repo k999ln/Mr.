@@ -1,0 +1,309 @@
+name: rockstar_ibot-local
+
+x-runtime-environment: &runtime-environment
+  LM_MODE: local
+  LM_RUNTIME_DATABASE_URL: postgresql://life_manager:life_manager_local@postgres:5432/life_manager
+  LM_DATA_DIR: /var/lib/rockstar_ibot/data
+  LM_CACHE_DIR: /var/lib/rockstar_ibot/cache
+  LM_OBJECT_DIR: /var/lib/rockstar_ibot/objects
+  LM_RECEIPT_DIR: /var/lib/rockstar_ibot/receipts
+  LM_LOG_DIR: /var/lib/rockstar_ibot/logs
+  MINIO_ENDPOINT: http://object-store:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-life_manager_local}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-life_manager_local_only}
+
+# Credentials and public origins owned by this installation. The API serves provider webhooks and
+# the scheduler launches the same server with the proactive loops enabled, so both processes need
+# this map. Values stay in deploy/local/.env (0600) or the cloud provider's secret vault.
+x-owner-core-environment: &owner-core-environment
+  LM_TELEGRAM_MODE: ${LM_TELEGRAM_MODE:-byob_single}
+  LM_TELEGRAM_BOT_TOKEN: ${LM_TELEGRAM_BOT_TOKEN:-}
+  LM_TELEGRAM_BOT_USERNAME: ${LM_TELEGRAM_BOT_USERNAME:-}
+  LM_TELEGRAM_WEBHOOK_SECRET: ${LM_TELEGRAM_WEBHOOK_SECRET:-}
+  LM_LATE_APPROVAL_CALLBACK_SECRET: ${LM_LATE_APPROVAL_CALLBACK_SECRET:-}
+  LM_PUBLIC_URL: ${LM_PUBLIC_URL:-}
+  LM_PANEL_BASE_URL: ${LM_PANEL_BASE_URL:-}
+  LM_WEB_ORIGIN: ${LM_WEB_ORIGIN:-}
+  LM_TIME_ZONE: ${LM_TIME_ZONE:-Asia/Tokyo}
+  SUPABASE_URL: ${SUPABASE_URL:-}
+  SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+  LM_UID_SECRET: ${LM_UID_SECRET:-}
+  LM_PANEL_SESSION_ROTATION_SECRET: ${LM_PANEL_SESSION_ROTATION_SECRET:-}
+  LM_CALL_SECRET: ${LM_CALL_SECRET:-}
+  LM_FEEDBACK_PROVENANCE_KEY: ${LM_FEEDBACK_PROVENANCE_KEY:-}
+  LM_INBOUND_SECRET: ${LM_INBOUND_SECRET:-}
+  LM_RELATIONS_HASH_SECRET: ${LM_RELATIONS_HASH_SECRET:-}
+  LM_FEEDBACK_DATABASE_URL: ${LM_FEEDBACK_DATABASE_URL:-}
+  COMPOSIO_API_KEY: ${COMPOSIO_API_KEY:-}
+  COMPOSIO_GCAL_AUTH_CONFIG: ${COMPOSIO_GCAL_AUTH_CONFIG:-}
+  GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+  LIFE_MAPS_KEY: ${LIFE_MAPS_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  TELNYX_API_KEY: ${TELNYX_API_KEY:-}
+  TELNYX_CONNECTION_ID: ${TELNYX_CONNECTION_ID:-}
+  TELNYX_PHONE_NUMBER: ${TELNYX_PHONE_NUMBER:-}
+  TELNYX_PUBLIC_KEY: ${TELNYX_PUBLIC_KEY:-}
+  PUBLIC_WSS: ${PUBLIC_WSS:-}
+  MAX_CONCURRENT_CALLS: ${MAX_CONCURRENT_CALLS:-8}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  LM_MAIL_FROM: ${LM_MAIL_FROM:-}
+  LM_REPLY_DOMAIN: ${LM_REPLY_DOMAIN:-}
+  UNIPILE_DSN: ${UNIPILE_DSN:-}
+  UNIPILE_TOKEN: ${UNIPILE_TOKEN:-}
+  UNIPILE_NOTIFY_SECRET: ${UNIPILE_NOTIFY_SECRET:-}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  LM_STRIPE_PAYMENT_LINK: ${LM_STRIPE_PAYMENT_LINK:-}
+  LM_DORAEMON_PAYMENT_LINK: ${LM_DORAEMON_PAYMENT_LINK:-}
+  INNGEST_SIGNING_KEY: ${INNGEST_SIGNING_KEY:-}
+  INNGEST_EVENT_KEY: ${INNGEST_EVENT_KEY:-}
+  LM_BROWSER_TASKS_ENABLED: ${LM_BROWSER_TASKS_ENABLED:-0}
+  LM_BROWSER_SESSION_KEY: ${LM_BROWSER_SESSION_KEY:-}
+  LM_AGENT_BROWSER_EMAIL: ${LM_AGENT_BROWSER_EMAIL:-}
+  LM_AGENT_BROWSER_NAME: ${LM_AGENT_BROWSER_NAME:-}
+  LM_ADMIN_TELEGRAM_CHAT_ID: ${LM_ADMIN_TELEGRAM_CHAT_ID:-}
+  LM_CODEX_BRIDGE_ENABLED: ${LM_CODEX_BRIDGE_ENABLED:-0}
+  LM_CODEX_ALLOWED_CHAT_IDS: ${LM_CODEX_ALLOWED_CHAT_IDS:-}
+  LM_CODEX_BRIDGE_TOKEN: ${LM_CODEX_BRIDGE_TOKEN:-}
+  LM_CODEX_BRIDGE_BASE_URL: ${LM_CODEX_BRIDGE_BASE_URL:-}
+  LM_CODEX_BRIDGE_TOKEN_SERVICE: ${LM_CODEX_BRIDGE_TOKEN_SERVICE:-com.k999ln.mr.codex-telegram-bridge}
+  LM_CODEX_BRIDGE_TOKEN_ACCOUNT: ${LM_CODEX_BRIDGE_TOKEN_ACCOUNT:-}
+  LM_CODEX_WORKDIR: ${LM_CODEX_WORKDIR:-}
+
+x-runtime-build: &runtime-build
+  context: ../..
+  dockerfile: apps/rockstar_ibot/Dockerfile.runtime
+
+x-runtime-dependencies: &runtime-dependencies
+  postgres:
+    condition: service_healthy
+  object-store:
+    condition: service_healthy
+  migrate:
+    condition: service_completed_successfully
+  runtime-init:
+    condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: life_manager
+      POSTGRES_USER: life_manager
+      POSTGRES_PASSWORD: life_manager_local
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U life_manager -d life_manager"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  object-store:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-life_manager_local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-life_manager_local_only}
+    ports:
+      - "${LM_LOCAL_MINIO_PORT:-19000}:9000"
+      - "${LM_LOCAL_MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - object-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: postgres:18-alpine
+    environment:
+      DATABASE_URL: postgresql://life_manager:life_manager_local@postgres:5432/life_manager
+    volumes:
+      - ../../apps/rockstar_ibot/migrations:/migrations:ro
+    command:
+      - sh
+      - -ec
+      - >
+        psql "$$DATABASE_URL" -v ON_ERROR_STOP=1
+        -f /migrations/20260729_runtime_jobs.sql
+        -f /migrations/20260729_runtime_scheduler_lease.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  runtime-init:
+    image: rockstar_ibot-local-runtime:dev
+    pull_policy: never
+    user: root
+    command:
+      - sh
+      - -ec
+      - >
+        mkdir -p /var/lib/rockstar_ibot/data /var/lib/rockstar_ibot/cache
+        /var/lib/rockstar_ibot/receipts /var/lib/rockstar_ibot/logs;
+        chown -R node:node /var/lib/rockstar_ibot
+    volumes:
+      - runtime-data:/var/lib/rockstar_ibot
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    image: rockstar_ibot-local-runtime:dev
+    build: *runtime-build
+    environment:
+      <<: [*runtime-environment, *owner-core-environment]
+      LM_DEPLOYMENT_ROLE: api
+      LIFE_RUN_LOOPS: "false"
+      PORT: "8788"
+    ports:
+      - "${LM_LOCAL_API_PORT:-18788}:8788"
+    volumes:
+      - runtime-data:/var/lib/rockstar_ibot
+    depends_on: *runtime-dependencies
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:8788/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  scheduler:
+    image: rockstar_ibot-local-runtime:dev
+    pull_policy: never
+    command: ["node", "scripts/runtime-up.js", "internal-scheduler"]
+    environment:
+      <<: [*runtime-environment, *owner-core-environment]
+      LM_DEPLOYMENT_ROLE: scheduler
+      LM_HONNE_EN_SHADOW_ENABLED: "false"
+      LM_HONNE_EN_SHADOW_TIME_ZONE: Asia/Tokyo
+      LM_HONNE_EN_PRODUCT_ID: honne-ai
+      LM_HONNE_EN_FORMAT_ID: reelclaw
+      LM_HONNE_EN_LOCALE: en
+      LM_HONNE_EN_TIKTOK_INTEGRATION_REF: ${LM_HONNE_EN_TIKTOK_INTEGRATION_REF:-}
+      LM_SCHEDULER_OWNER: local-primary
+      LM_SCHEDULER_LEASE_KEY: primary
+      LM_RUNTIME_TENANT_ID: ${LM_RUNTIME_TENANT_ID:-}
+      LM_FINANCIAL_REPORT_FORCE_ON_START: ${LM_FINANCIAL_REPORT_FORCE_ON_START:-}
+      LM_FINANCIAL_REPORT_POLL_MS: ${LM_FINANCIAL_REPORT_POLL_MS:-300000}
+      LM_TELEGRAM_TOKEN_REF: ${LM_TELEGRAM_TOKEN_REF:-secret://telegram/bot-token}
+      LM_MARKETING_GENERATION_ENABLED: ${LM_MARKETING_GENERATION_ENABLED:-false}
+      LM_MARKETING_GENERATION_POLL_MS: ${LM_MARKETING_GENERATION_POLL_MS:-60000}
+      LM_MARKETING_GENERATION_TIME_ZONE: ${LM_MARKETING_GENERATION_TIME_ZONE:-Asia/Tokyo}
+      LM_MARKETING_GENERATION_BANK_REF: ${LM_MARKETING_GENERATION_BANK_REF:-}
+      LM_MARKETING_GENERATION_CALL_AUDIO_REF: ${LM_MARKETING_GENERATION_CALL_AUDIO_REF:-}
+      LM_MARKETING_GENERATION_STOCK_REF: ${LM_MARKETING_GENERATION_STOCK_REF:-}
+      LM_MARKETING_GENERATION_TELEGRAM_PROOF_REF: ${LM_MARKETING_GENERATION_TELEGRAM_PROOF_REF:-}
+      LM_MARKETING_GENERATION_WHISPER_ASS_REF: ${LM_MARKETING_GENERATION_WHISPER_ASS_REF:-}
+      LM_MARKETING_PUBLICATION_CHAIN_ENABLED: ${LM_MARKETING_PUBLICATION_CHAIN_ENABLED:-false}
+      LM_MARKETING_PUBLICATION_CHAIN_POLL_MS: ${LM_MARKETING_PUBLICATION_CHAIN_POLL_MS:-60000}
+      LM_MARKETING_PUBLICATION_CHAIN_AFTER: ${LM_MARKETING_PUBLICATION_CHAIN_AFTER:-}
+      LM_MARKETING_PUBLICATION_CHAIN_CAPTION_REF: ${LM_MARKETING_PUBLICATION_CHAIN_CAPTION_REF:-}
+      LM_MARKETING_PUBLICATION_CHAIN_APPROVAL_REF: ${LM_MARKETING_PUBLICATION_CHAIN_APPROVAL_REF:-}
+      LM_MARKETING_OBSERVATION_ENABLED: ${LM_MARKETING_OBSERVATION_ENABLED:-false}
+      LM_MARKETING_OBSERVATION_POLL_MS: ${LM_MARKETING_OBSERVATION_POLL_MS:-60000}
+      LM_MARKETING_OBSERVATION_AFTER: ${LM_MARKETING_OBSERVATION_AFTER:-}
+      LM_MARKETING_OBSERVATION_PRODUCT_ID: ${LM_MARKETING_OBSERVATION_PRODUCT_ID:-}
+      LIFE_RUN_LOOPS: "true"
+      PORT: "8788"
+    volumes:
+      - runtime-data:/var/lib/rockstar_ibot
+    depends_on: *runtime-dependencies
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:8788/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  marketing-liveness:
+    image: rockstar_ibot-local-runtime:dev
+    pull_policy: never
+    command: ["node", "scripts/runtime-up.js", "internal-liveness"]
+    environment:
+      <<: *runtime-environment
+      LM_DEPLOYMENT_ROLE: liveness
+      LM_RUNTIME_TENANT_ID: ${LM_RUNTIME_TENANT_ID:-}
+      LM_MARKETING_LIVENESS_LANES_JSON: ${LM_MARKETING_LIVENESS_LANES_JSON:-[]}
+      LM_MARKETING_LIVENESS_POLL_MS: ${LM_MARKETING_LIVENESS_POLL_MS:-60000}
+      LM_MARKETING_LIVENESS_HEALTH_PORT: "8791"
+      LM_TELEGRAM_TOKEN_REF: ${LM_TELEGRAM_TOKEN_REF:-secret://telegram/bot-token}
+      LIFE_RUN_LOOPS: "false"
+    ports:
+      - "${LM_LOCAL_LIVENESS_HEALTH_PORT:-18791}:8791"
+    volumes:
+      - runtime-data:/var/lib/rockstar_ibot
+    depends_on: *runtime-dependencies
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:8791/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  worker:
+    image: rockstar_ibot-local-runtime:dev
+    build: *runtime-build
+    pull_policy: never
+    command: ["node", "scripts/runtime-up.js", "internal-worker"]
+    environment:
+      <<: *runtime-environment
+      LM_DEPLOYMENT_ROLE: worker
+      LM_WORKER_ID: local-runtime-worker
+      LM_WORKER_CAPABILITIES: ${LM_WORKER_CAPABILITIES:-runtime.noop}
+      LM_WORKER_LEASE_SECONDS: ${LM_WORKER_LEASE_SECONDS:-300}
+      LM_RUNTIME_TENANT_ID: ${LM_RUNTIME_TENANT_ID:-}
+      LM_TELEGRAM_BOT_TOKEN: ${LM_TELEGRAM_BOT_TOKEN:-}
+      LM_TELEGRAM_ALERT_CHAT_ID: ${LM_TELEGRAM_ALERT_CHAT_ID:-}
+      LM_POSTIZ_API_KEY: ${LM_POSTIZ_API_KEY:-}
+      LM_INSTAGRAM_HANDLE: ${LM_INSTAGRAM_HANDLE:-}
+      LM_INSTAGRAM_ACCOUNTS_PATH: ${LM_INSTAGRAM_ACCOUNTS_PATH:-}
+      LM_INSTAGRAM_SETTINGS_PATH: ${LM_INSTAGRAM_SETTINGS_PATH:-}
+      LM_INSTAGRAM_CREDENTIALS_PATH: ${LM_INSTAGRAM_CREDENTIALS_PATH:-}
+      LM_INSTAGRAM_PROFILE_STATE_DIR: ${LM_INSTAGRAM_PROFILE_STATE_DIR:-}
+      LM_TIKTOK_INTEGRATION: ${LM_TIKTOK_INTEGRATION:-}
+      LM_HONNE_EN_INSTAGRAM_PROFILE_REF: ${LM_HONNE_EN_INSTAGRAM_PROFILE_REF:-}
+      LM_HONNE_EN_TIKTOK_INTEGRATION_REF: ${LM_HONNE_EN_TIKTOK_INTEGRATION_REF:-}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      BASE_RPC_URL: ${BASE_RPC_URL:-https://mainnet.base.org}
+      LM_WORKER_HEALTH_PORT: "8790"
+      LIFE_RUN_LOOPS: "false"
+    ports:
+      - "${LM_LOCAL_WORKER_HEALTH_PORT:-18790}:8790"
+    volumes:
+      - runtime-data:/var/lib/rockstar_ibot
+    depends_on: *runtime-dependencies
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://localhost:8790/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  object-data:
+  runtime-data:

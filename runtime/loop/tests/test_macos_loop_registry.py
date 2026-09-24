@@ -1,0 +1,142 @@
+import json
+import copy
+import re
+import time
+import unittest
+from pathlib import Path
+
+from runtime.loop.macos_loop_registry import render_job_models, validate_registry
+from runtime.loop.lm_loop import status_rows
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def entry(label="ai.anicca.example"):
+    return {
+        "label": label,
+        "domain": "system",
+        "entrypoint": "bin/example.sh",
+        "cadence": {"run_at_load": True},
+        "effect_class": "none",
+        "state_root": "~/.local/state/rockstar_ibot/example",
+        "log_root": "~/.local/state/rockstar_ibot/example/logs",
+        "cleanup": {"max_runs": 10, "max_age_days": 7},
+        "provider_route": "deterministic",
+    }
+
+
+class MacosLoopRegistryTest(unittest.TestCase):
+    def test_registry_rejects_missing_and_secret_fields(self):
+        missing = {"schema_version": 2, "loops": {"example": entry()}}
+        del missing["loops"]["example"]["cleanup"]
+        with self.assertRaisesRegex(ValueError, "cleanup"):
+            validate_registry(missing)
+
+        secret = {"schema_version": 2, "loops": {"example": entry()}}
+        secret["loops"]["example"]["auth_token"] = "not-a-real-secret"
+        with self.assertRaisesRegex(ValueError, "secret-like"):
+            validate_registry(secret)
+
+    def test_keepalive_browser_requires_a_screen_safe_policy(self):
+        browser = entry("ai.anicca.example-browser")
+        browser["cadence"] = {"keep_alive": True}
+        missing = {"schema_version": 2, "loops": {"example-browser": browser}}
+        with self.assertRaisesRegex(ValueError, "requires browser_policy"):
+            validate_registry(missing)
+        browser["browser_policy"] = {
+            "execution_surface": "local_headless",
+            "screen_impact": "foreground",
+            "interactive_handoff": "approval_required",
+            "interactive_timeout_seconds": 900,
+        }
+        with self.assertRaisesRegex(ValueError, "screen_impact"):
+            validate_registry(missing)
+
+    def test_external_labels_are_explicit_and_cannot_overlap_managed(self):
+        value = {"schema_version": 2, "loops": {"example": entry()},
+                 "external_labels": ["ai.anicca.tsbridge"]}
+        self.assertEqual(validate_registry(value), value)
+        value["external_labels"] = ["ai.anicca.example"]
+        with self.assertRaisesRegex(ValueError, "overlap"):
+            validate_registry(value)
+
+    def test_render_is_byte_stable_for_loop_insertion_order(self):
+        left = {"schema_version": 2, "loops": {"b": entry("ai.anicca.b"), "a": entry("ai.anicca.a")}}
+        right = {"schema_version": 2, "loops": {"a": entry("ai.anicca.a"), "b": entry("ai.anicca.b")}}
+        self.assertEqual(render_job_models(left), render_job_models(right))
+
+    def test_registry_covers_every_active_owned_inventory_label(self):
+        registry = json.loads((ROOT / "config/loop-registry.json").read_text())
+        inventory = json.loads((ROOT / "docs/evidence/runtime/2026-08-28-macos-loop-control-plane-inventory.json").read_text())
+        validate_registry(registry)
+        expected = {
+            row["label"] for row in inventory["labels"]
+            if row["installed"] and row["owner"] == "rockstar_ibot"
+            and row["launchd_state"].startswith("loaded")
+        }
+        expected -= set(registry.get("retired_labels", []))
+        self.assertEqual({row["label"] for row in registry["loops"].values()}, expected)
+        self.assertEqual(registry["loops"]["pm-live-trade"]["effect_class"], "trade")
+        self.assertEqual(registry["loops"]["rockstar-ibot-payout"]["effect_class"], "money")
+        self.assertEqual(registry["loops"]["rockstar-ibot-honne-ja"]["effect_class"], "publish")
+        self.assertEqual(registry["loops"]["agentmail-replier"]["domain"], "earn")
+        self.assertEqual(registry["loops"]["stripe-revenue-listener"]["effect_class"], "message")
+        self.assertEqual(registry["loops"]["stripe-revenue-poller"]["effect_class"], "message")
+        for label in {
+            "ai.anicca.phone-conversation",
+            "ai.anicca.phone-tunnel",
+            "ai.anicca.phone-tunnel-watcher",
+            "ai.anicca.pipecat-phone",
+            "ai.anicca.telegram-bot",
+            "ai.anicca.tg-loc-bot",
+        }:
+            self.assertIn(label, registry["retired_labels"])
+            self.assertNotIn(label, {row["label"] for row in registry["loops"].values()})
+        self.assertEqual(registry["loops"]["x-repost"]["label"], "ai.anicca.x-repost-pass")
+        self.assertEqual(registry["loops"]["x-tweeter"]["label"], "ai.anicca.x-tweeter-pass")
+        self.assertEqual(registry["loops"]["x-tweeter"]["cadence"],
+                         {"calendar_interval": {"Minute": 15}})
+
+    def test_production_render_matches_byte_stable_fixture(self):
+        registry = json.loads((ROOT / "config/loop-registry.json").read_text())
+        expected = (ROOT / "runtime/loop/tests/fixtures/macos-loop-jobs.json").read_bytes()
+        self.assertEqual(render_job_models(registry), expected)
+
+    def test_loop_entrypoints_do_not_select_auth_or_codex_home(self):
+        registry = json.loads((ROOT / "config/loop-registry.json").read_text())
+        forbidden = re.compile(r"CODEX_HOME|auth\.json|AGENT_RUNNER_PROVIDER")
+        violations = []
+        for loop_id, entry in registry["loops"].items():
+            path = ROOT / entry["entrypoint"]
+            if path.is_file() and forbidden.search(path.read_text(errors="replace")):
+                violations.append((loop_id, entry["entrypoint"]))
+        self.assertEqual(violations, [])
+
+    def test_render_500_loops_and_status_under_five_seconds(self):
+        base = entry()
+        loops = {}
+        for index in range(500):
+            loop_id = f"scale-{index:03d}"
+            row = copy.deepcopy(base)
+            row["label"] = f"ai.anicca.{loop_id}"
+            row["state_root"] = f"~/.local/state/rockstar_ibot/{loop_id}"
+            row["log_root"] = f"~/.local/state/rockstar_ibot/{loop_id}/logs"
+            loops[loop_id] = row
+        registry = {"schema_version": 2, "loops": loops}
+
+        started = time.perf_counter()
+        rendered = render_job_models(registry)
+        render_seconds = time.perf_counter() - started
+        started = time.perf_counter()
+        rows = status_rows(
+            registry, loaded={}, disabled={}, events={}, installed_releases={})
+        status_seconds = time.perf_counter() - started
+
+        self.assertEqual((len(rendered.splitlines()), len(rows)), (1, 500))
+        self.assertLess(render_seconds, 5)
+        self.assertLess(status_seconds, 5)
+
+
+if __name__ == "__main__":
+    unittest.main()

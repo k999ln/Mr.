@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# cut-loop-release.sh — turn a commit into an immutable release that launchd can point at.
+#
+#   bash bin/cut-loop-release.sh [<ref>]        # default: HEAD
+#
+# Why this exists: 221 of the 241 launchd agents on this machine run their code straight out of a
+# git working tree (measured 2026-08-17 via bin/launchd_inventory.py). A working tree follows
+# whoever is working in it, so a branch switch deletes a scheduled job's code out from under it --
+# which is exactly what happened to the x-repost loop that day.
+#
+# The shape is the one this house already uses for the gig lanes (~/gig/releases/<repo>/<sha>/) and
+# the one Capistrano documents: releases accumulate under their own id, a single `current` symlink
+# selects one, and rollback is moving that symlink back. 12-factor V puts it plainly -- "it is
+# impossible to make changes to the code at runtime" -- which a chmod -R a-w export enforces
+# literally rather than by convention.
+#
+# State is deliberately NOT inside a release: see LOOPS_STATE_ROOT below.
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOOPS_ROOT="${LOOPS_ROOT:-$HOME/loops}"
+RELEASES="$LOOPS_ROOT/releases"
+CURRENT="$LOOPS_ROOT/current"
+# state root is intentionally not resolved here (see RELEASE.json note below)
+KEEP="${LOOPS_KEEP_RELEASES:-5}"
+REF="${1:-HEAD}"
+RELEASE_PATHS="${LOOPS_RELEASE_PATHS:-}"
+
+die() { echo "cut-loop-release: $*" >&2; exit 1; }
+
+prune_releases_after() {
+  local keep="$1"
+  LIFE_MANAGER_RELEASE_KEEP="$keep" \
+    python3 "$REPO_ROOT/runtime/loop/central_cleanup.py" --release-gc-only >/dev/null || \
+    die "safe release pruning failed"
+}
+
+SHA="$(git -C "$REPO_ROOT" rev-parse "$REF" 2>/dev/null)" || die "cannot resolve ref '$REF'"
+SHORT="${SHA:0:8}"
+
+# A release nobody else can fetch is not reproducible, and the acceptance bar this house already
+# applies to the gig lanes is that the installed SHA is an ancestor of origin/main.
+if ! git -C "$REPO_ROOT" cat-file -e "$SHA^{commit}" 2>/dev/null; then
+  die "$SHORT is not a commit"
+fi
+git -C "$REPO_ROOT" fetch --quiet origin 2>/dev/null || echo "cut-loop-release: WARNING fetch failed, ancestry check uses stale refs" >&2
+if git -C "$REPO_ROOT" merge-base --is-ancestor "$SHA" origin/main 2>/dev/null; then
+  PROVENANCE="ancestor-of-origin-main"
+elif git -C "$REPO_ROOT" branch -r --contains "$SHA" 2>/dev/null | grep -q .; then
+  PROVENANCE="pushed-not-yet-on-main"
+  echo "cut-loop-release: NOTE $SHORT is pushed but not on origin/main yet" >&2
+else
+  die "$SHORT exists only locally -- push it before cutting a release"
+fi
+
+DEST="$RELEASES/$(date +%Y%m%dT%H%M%S)-$SHORT"
+[ -e "$DEST" ] && die "$DEST already exists"
+# Prune before export as well as after it. Waiting until after extraction requires enough free
+# space for KEEP+1 complete trees and made an otherwise recoverable release install fail ENOSPC.
+# Keep current plus rollback capacity; the new export becomes the next retained generation.
+PRE_KEEP=$((KEEP > 1 ? KEEP - 1 : 1))
+prune_releases_after "$PRE_KEEP"
+# Only the release dir: each loop's state dir belongs to that loop's job, and creating a shared
+# empty one here would advertise a location nothing actually writes to.
+mkdir -p "$DEST" || die "cannot create $DEST"
+
+# git archive exports the committed tree only: no .git, no untracked scratch, no local edits. A
+# loop-specific owner may request a whitespace-separated path allowlist; the default remains the
+# complete repository for callers that need it. This keeps a 300 KiB X runtime from requiring a
+# 57 MiB export on a disk-constrained host.
+ARCHIVE_PATHS=()
+if [ -n "$RELEASE_PATHS" ]; then
+  read -r -a ARCHIVE_PATHS <<<"$RELEASE_PATHS"
+  # launchctl-safe is not standalone: every mutating command executes the shared Aqua/user
+  # bootstrap preflight first. A sparse release that includes the wrapper but omits this module
+  # cannot safely kick an owner, so close that dependency automatically instead of relying on
+  # every caller to remember a second path.
+  case " $RELEASE_PATHS " in
+    *" bin "*)
+      case " $RELEASE_PATHS " in
+        *" skills/_shared "*) ;;
+        *) ARCHIVE_PATHS+=("skills/_shared") ;;
+      esac
+      ;;
+  esac
+fi
+if [ "${#ARCHIVE_PATHS[@]}" -eq 0 ]; then
+  git -C "$REPO_ROOT" archive --format=tar "$SHA" | tar -x -C "$DEST"
+  ARCHIVE_RC=$?
+else
+  git -C "$REPO_ROOT" archive --format=tar "$SHA" -- "${ARCHIVE_PATHS[@]}" | tar -x -C "$DEST"
+  ARCHIVE_RC=$?
+fi
+if [ "$ARCHIVE_RC" -ne 0 ]; then
+  rm -rf "$DEST"
+  die "export of $SHORT failed"
+fi
+
+cat >"$DEST/RELEASE.json" <<EOF
+{
+  "sha": "$SHA",
+  "ref": "$REF",
+  "provenance": "$PROVENANCE",
+  "cut_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "repo": "$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null)",
+  "state_root": "${LOOPS_STATE_ROOT:-set per loop by its launchd job, not by this release}",
+  "release_paths": "${ARCHIVE_PATHS[*]:-ALL}"
+}
+EOF
+
+# One writable carve-out, created before the export is sealed. The CEO registry gate writes the
+# cadence it just computed to state/effective-cron/<loop>.txt, resolved relative to the repo root --
+# which is this release. A fully read-only export made every pass log a permission error before
+# failing open. That file is derived from the registry on each pass, so it is scratch rather than
+# state worth preserving, and one writable directory costs nothing while the code stays immutable.
+mkdir -p "$DEST/state/effective-cron"
+
+chmod -R a-w "$DEST" 2>/dev/null || true
+chmod -R u+w "$DEST/state" 2>/dev/null || true
+
+# rename(2) over an existing symlink is atomic, so no pass can ever observe a missing `current`.
+# -h is load-bearing: without it mv follows `current` into the directory it points at and creates
+# the new link INSIDE the old release instead of replacing it.
+ln -sfn "$DEST" "$CURRENT.swap" && mv -fh "$CURRENT.swap" "$CURRENT" || die "could not move the current symlink"
+
+# Keep a few older releases so rollback is a symlink move rather than a rebuild.
+prune_releases_after "$KEEP"
+
+echo "current -> $(readlink "$CURRENT")  ($PROVENANCE)"

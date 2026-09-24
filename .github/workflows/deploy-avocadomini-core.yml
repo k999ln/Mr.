@@ -1,0 +1,118 @@
+name: Deploy avocadomini Core
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-avocadomini-core.yml
+      - apps/rockstar_ibot/**
+      - packages/telegram-bot-family/**
+      - skills/video/**
+      - skills/earn/marketing-engine/**
+      - Dockerfile
+      - railway.toml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avocadomini-core-production
+  cancel-in-progress: false
+
+env:
+  RAILWAY_PROJECT_ID: 334bb7a0-5431-4863-b6b3-9793b6063c3a
+  RAILWAY_ENVIRONMENT: production
+  RAILWAY_SERVICE: avocadomini-core
+  CORE_URL: https://avocadomini-core-production.up.railway.app
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: apps/rockstar_ibot/package-lock.json
+      - name: Install exact Core dependencies
+        working-directory: apps/rockstar_ibot
+        run: npm ci --ignore-scripts
+      - name: Verify Telegram, Codex Job, ledger, and tenant boundaries
+        working-directory: apps/rockstar_ibot
+        run: |
+          npm run test:doraemon-runtime
+          node --test lib/ledger.test.js
+          npm audit --omit=dev --audit-level=moderate
+      - name: Verify canonical repository and legacy isolation
+        run: |
+          npm run test:oss
+          npm run owner:audit
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+      - name: Check encrypted deploy credential
+        id: credential
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -n "$RAILWAY_TOKEN" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'RAILWAY_TOKEN is not configured; verification passed and deployment was safely skipped.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Deploy the exact GitHub commit
+        if: steps.credential.outputs.enabled == 'true'
+        id: railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes @railway/cli@5.49.1 variable set "LM_BUILD_SHA=$GITHUB_SHA" \
+            --skip-deploys --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" --service "$RAILWAY_SERVICE"
+          response="$(npx --yes @railway/cli@5.49.1 up --detach --json \
+            --message "GitHub main $GITHUB_SHA" --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" --service "$RAILWAY_SERVICE")"
+          deployment_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.deploymentId) process.exit(1); process.stdout.write(x.deploymentId)' "$response")"
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+          echo "Deployment ID: $deployment_id" >> "$GITHUB_STEP_SUMMARY"
+      - name: Wait for Railway health-gated success
+        if: steps.credential.outputs.enabled == 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          DEPLOYMENT_ID: ${{ steps.railway.outputs.deployment_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..36}; do
+            response="$(npx --yes @railway/cli@5.49.1 deployment list --json \
+              --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT" \
+              --service "$RAILWAY_SERVICE")"
+            state="$(node -e 'const rows=JSON.parse(process.argv[1]); const row=rows.find(x=>x.id===process.argv[2]); process.stdout.write(row?.status||"MISSING")' "$response" "$DEPLOYMENT_ID")"
+            case "$state" in
+              SUCCESS) break ;;
+              FAILED|CRASHED|REMOVED) echo "Railway deployment ended in $state" >&2; exit 1 ;;
+            esac
+            [[ "$attempt" == 36 ]] && { echo 'Railway deployment timed out' >&2; exit 1; }
+            sleep 10
+          done
+      - name: Verify public Core build receipt
+        if: steps.credential.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error "$CORE_URL/health")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(x.ok!==true||x.build!==process.argv[2]) process.exit(1)' "$body" "$GITHUB_SHA"
+          echo "Core health: HTTP 200, build $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+

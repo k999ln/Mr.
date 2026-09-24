@@ -1,0 +1,4 @@
+interface:
+  display_name: "Apply to Funder"
+  short_description: "Prepare and verify Rockstar_ibot fundraising applications"
+  default_prompt: "Use $apply-to-funder to prepare an evidence-backed fundraising application for Rockstar_ibot."

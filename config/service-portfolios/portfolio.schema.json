@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rockstar-ibot.local/schemas/service-portfolio.v1.json",
+  "title": "Rockstar_ibot service portfolio",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "portfolio_id",
+    "status",
+    "name",
+    "tagline",
+    "audience",
+    "launch_cohort",
+    "core",
+    "service_slots",
+    "personalization_contract",
+    "global_invariants",
+    "launch_gates",
+    "capacity_model",
+    "pricing"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "portfolio_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+    "status": {"enum": ["design_candidate", "pilot", "active", "retired"]},
+    "name": {"type": "string", "minLength": 1, "maxLength": 100},
+    "tagline": {"type": "string", "minLength": 1, "maxLength": 200},
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "jobs_to_be_done", "excluded_initially"],
+      "properties": {
+        "primary": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "jobs_to_be_done": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "excluded_initially": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "launch_cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "registered_user_target", "purpose"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "registered_user_target": {"type": "integer", "minimum": 1},
+        "purpose": {"type": "string", "minLength": 1}
+      }
+    },
+    "core": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "service_slots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/serviceSlot"}
+    },
+    "personalization_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suggestion_only", "requires_user_approval", "allowed_overrides", "forbidden_overrides"],
+      "properties": {
+        "suggestion_only": {"const": true},
+        "requires_user_approval": {"const": true},
+        "allowed_overrides": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "forbidden_overrides": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "global_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "launch_gates": {
+      "type": "object",
+      "additionalProperties": {"type": ["string", "number", "integer", "boolean"]},
+      "minProperties": 1
+    },
+    "capacity_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planning_only",
+        "registered_users",
+        "assumed_daily_active_rate",
+        "jobs_per_active_user_per_day",
+        "peak_hour_fraction",
+        "average_job_seconds",
+        "minimum_worker_concurrency",
+        "load_test_concurrency"
+      ],
+      "properties": {
+        "planning_only": {"const": true},
+        "registered_users": {"type": "integer", "minimum": 1},
+        "assumed_daily_active_rate": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "jobs_per_active_user_per_day": {"type": "number", "exclusiveMinimum": 0},
+        "peak_hour_fraction": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "average_job_seconds": {"type": "integer", "minimum": 1},
+        "minimum_worker_concurrency": {"type": "integer", "minimum": 1},
+        "load_test_concurrency": {"type": "integer", "minimum": 1}
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "model", "principles"],
+      "properties": {
+        "status": {"enum": ["not_validated", "experiment", "active"]},
+        "model": {"type": "string", "minLength": 1},
+        "principles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component_id", "name", "purpose", "required"],
+      "properties": {
+        "component_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 100},
+        "purpose": {"type": "string", "minLength": 1, "maxLength": 500},
+        "required": {"type": "boolean"}
+      }
+    },
+    "serviceSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot_id",
+        "name",
+        "promise",
+        "default_cell",
+        "allowed_variants",
+        "default_enabled",
+        "deliverables",
+        "performance_targets"
+      ],
+      "properties": {
+        "slot_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 100},
+        "promise": {"type": "string", "minLength": 1, "maxLength": 300},
+        "default_cell": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"},
+        "allowed_variants": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "default_enabled": {"type": "boolean"},
+        "deliverables": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "performance_targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_minutes", "revision_limit", "quality_gate"],
+          "properties": {
+            "target_minutes": {"type": "integer", "minimum": 1},
+            "revision_limit": {"type": "integer", "minimum": 0},
+            "quality_gate": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    }
+  }
+}

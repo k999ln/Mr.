@@ -1,0 +1,10 @@
+**
+!packages/
+!packages/automation-hub/
+!packages/automation-hub/index.mjs
+!packages/automation-hub/catalog.json
+!services/
+!services/automation-runner/
+!services/automation-runner/package.json
+!services/automation-runner/cli.mjs
+!services/automation-runner/server.mjs

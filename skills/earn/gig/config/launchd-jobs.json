@@ -1,0 +1,584 @@
+{
+  "version": 1,
+  "_note": [
+    "The four coconala lanes, shared browser, and the Writer lanes, as data instead of",
+    "hand-maintained plists. gig_release.py renders these against a release tree and",
+    "loads them. Values in {{...}} come from `defaults` below, overridden per machine",
+    "by ~/.config/anicca/gig/install.json, so a fresh Mac gets working paths and this",
+    "machine keeps the exact ones its lanes already run on.",
+    "Anything that is a real secret belongs in neither file: no lane reads a credential",
+    "from its environment -- the browser profile carries the coconala login."
+  ],
+
+  "defaults": {
+    "PYTHON": "/opt/homebrew/bin/python3",
+    "HOME": "{{HOME}}",
+    "PATH": "{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "GIG_STATE_DIR": "{{HOME}}/gig",
+    "GIG_LOG_DIR": "{{GIG_STATE_DIR}}/logs",
+    "GIG_BRAKE_DIR": "{{GIG_STATE_DIR}}/state",
+    "LIFE_MANAGER_HOME": "{{HOME}}/.local/state/rockstar_ibot",
+    "CDP_PORT": "9223",
+    "CDP_DAILY_DRIVER_PROFILE": "{{HOME}}/.cloak/profiles/gig-daily-driver",
+    "SESSION_VAULT_DIR": "{{HOME}}/.cloak/vault/gig-daily-driver",
+    "CLOAK_VAULT_DIR": "{{HOME}}/.cloak/vault",
+    "GIG_BROWSER_FINGERPRINT": "",
+    "GIG_BROWSER_TLS_COMPAT": "",
+    "GIG_REPORT_CHAT": "",
+    "GIG_NOTIFY_EMAIL": "",
+    "GIG_GOG_ACCOUNT": "",
+    "GIG_GOG_BIN": "/opt/homebrew/bin/gog",
+    "GIG_SANDBOX_DENY": "",
+    "GIG_STOREFRONT_ROOT": "",
+    "GIG_STOREFRONT_TARGET_SERVICE_ID": "",
+    "GIG_STOREFRONT_GALLERY_SERVICE_ID": "",
+    "GIG_STOREFRONT_PRESENTATION_SERVICE_ID": "",
+    "GIG_STOREFRONT_SCOPE_SERVICE_ID": "",
+    "GIG_STOREFRONT_CAPABILITY_EVIDENCE": "",
+    "GIG_OWNER_PROFILE": "{{HOME}}/.config/anicca/gig/owner-profile.json",
+    "WRITER_STATE_DIR": "{{HOME}}/.local/state/rockstar_ibot/writer",
+    "WRITER_LOG_DIR": "{{HOME}}/.openclaw/logs",
+    "WRITER_TELEGRAM_TARGET": "",
+    "WRITER_GMAIL_ACCOUNT": "",
+    "ANICCA_JOB_PROFILE": "{{HOME}}/.config/anicca/job-search/profile.json"
+  },
+
+  "shared_env": {
+    "HOME": "{{HOME}}",
+    "PATH": "{{PATH}}",
+    "CLOAK_BROWSER_LAUNCHD_LABEL": "ai.anicca.hf-gig-browser",
+    "CLOAK_CDP_BASE_URL": "http://127.0.0.1:{{CDP_PORT}}",
+    "CDP_DAILY_DRIVER_PORT": "{{CDP_PORT}}",
+    "CDP_DAILY_DRIVER_PROFILE": "{{CDP_DAILY_DRIVER_PROFILE}}",
+    "GIG_STATE_DIR": "{{GIG_STATE_DIR}}",
+    "GIG_ENV_FILE": "{{LIFE_MANAGER_HOME}}/.env",
+    "GIG_REPORT_CHAT": "{{GIG_REPORT_CHAT}}",
+    "GIG_NOTIFY_EMAIL": "{{GIG_NOTIFY_EMAIL}}",
+    "GIG_GOG_ACCOUNT": "{{GIG_GOG_ACCOUNT}}",
+    "GIG_GOG_BIN": "{{GIG_GOG_BIN}}",
+    "LIFE_MANAGER_HOME": "{{LIFE_MANAGER_HOME}}",
+    "LIFE_MANAGER_REPO": "{{RELEASE}}",
+    "GIG_STOREFRONT_ROOT": "{{GIG_STOREFRONT_ROOT}}",
+    "GIG_OWNER_PROFILE": "{{GIG_OWNER_PROFILE}}",
+    "ANICCA_JOB_PROFILE": "{{ANICCA_JOB_PROFILE}}"
+  },
+
+  "writer_env": {
+    "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+    "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+    "GIG_DISK_HEADROOM_KIB": "524288",
+    "CLOAK_BROWSER_LAUNCHD_LABEL": "ai.anicca.job-search-browser",
+    "CLOAK_CDP_BASE_URL": "http://127.0.0.1:9222",
+    "CDP_DAILY_DRIVER_PORT": "9222",
+    "CDP_DAILY_DRIVER_PROFILE": "{{HOME}}/.cloak/profiles/job-search-daily",
+    "WRITER_BROWSER_LAUNCHD_LABEL": "ai.anicca.job-search-browser",
+    "WRITER_CDP_URL": "http://127.0.0.1:9222",
+    "WRITER_CDP_PORT": "9222",
+    "WRITER_CDP_PROFILE": "{{HOME}}/.cloak/profiles/job-search-daily",
+    "ARTICLE_ROOT": "{{RELEASE}}/skills/writer-agent",
+    "ARTICLE_SKILL_DIR": "{{RELEASE}}/skills/writer-agent",
+    "ARTICLE_STATE_DIR": "{{WRITER_STATE_DIR}}",
+    "WRITER_STATE_DIR": "{{WRITER_STATE_DIR}}",
+    "ARTICLE_PUBLICATION_PAUSE_FILE": "{{WRITER_STATE_DIR}}/.publication-paused",
+    "GIG_STATE_DIR": "{{WRITER_STATE_DIR}}",
+    "GIG_LOG_DIR": "{{WRITER_LOG_DIR}}",
+    "ARTICLE_MODEL_ROOT": "{{RELEASE}}/skills/writer-agent",
+    "ARTICLE_MODEL_STATE_ROOT": "{{WRITER_STATE_DIR}}",
+    "ARTICLE_MODEL_LOG": "{{WRITER_LOG_DIR}}/model-runner.log",
+    "ARTICLE_PROVIDER_HEALTH": "{{WRITER_STATE_DIR}}/provider-health.json",
+    "ARTICLE_PROVIDER": "codex",
+    "ARTICLE_PROVIDER_COOLDOWN_SECONDS": "300",
+    "ARTICLE_AUTOPUBLISH": "1",
+    "ARTICLE_CODEX_PROVIDER_ID": "local_proxy",
+    "ARTICLE_CODEX_PROVIDER_BASE_URL": "http://127.0.0.1:8317/v1",
+    "ARTICLE_CODEX_PROVIDER_ENV_KEY": "CLIPROXY_API_KEY",
+    "ARTICLE_CODEX_PROVIDER_API_KEY_SOURCE": "cliproxyapi",
+    "TELEGRAM_TARGET_ID": "{{WRITER_TELEGRAM_TARGET}}"
+  },
+
+  "jobs": [
+    {
+      "label": "ai.anicca.rockstar_ibot-upwork-browser",
+      "lane": "upwork-browser",
+      "summary": "Keeps the dedicated logged-in Chromium for the zero-spend Upwork lane.",
+      "program": [
+        "/bin/bash",
+        "{{RELEASE}}/skills/earn/gig/scripts/launch_gig_browser.sh"
+      ],
+      "env": {
+        "GIG_BROWSER_PORT": "9233",
+        "GIG_BROWSER_PROFILE": "{{HOME}}/.cloak/profiles/gig-upwork",
+        "GIG_BROWSER_FINGERPRINT": "80138",
+        "GIG_DISK_HEADROOM_KIB": "524288",
+        "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+        "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+        "CLOAK_CDP_BASE_URL": "http://127.0.0.1:9233",
+        "CLOAK_BROWSER_LAUNCHD_LABEL": "ai.anicca.rockstar_ibot-upwork-browser"
+      },
+      "RunAtLoad": true,
+      "KeepAlive": true,
+      "ThrottleInterval": 30,
+      "ProcessType": "Background",
+      "log_basename": "upwork-browser-launchd"
+    },
+    {
+      "label": "ai.anicca.rockstar_ibot-upwork-free-loop",
+      "lane": "upwork-free",
+      "summary": "Reconciles free Upwork capacity, invitations, proposals, and offers without purchasing anything.",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/providers/upwork_browser_provider.py",
+        "--cdp-base",
+        "http://127.0.0.1:9233",
+        "--browser-profile",
+        "{{HOME}}/.cloak/profiles/gig-upwork",
+        "--candidates",
+        "{{RELEASE}}/skills/earn/gig/config/upwork-candidates.public.json",
+        "--transitions",
+        "{{GIG_STATE_DIR}}/state/upwork-free-transitions.jsonl",
+        "--output",
+        "{{GIG_STATE_DIR}}/state/upwork-free-loop.json"
+      ],
+      "env": {
+        "CLOAK_BROWSER_OWNER": "rockstar_ibot-upwork-free-loop",
+        "CLOAK_CDP_BASE_URL": "http://127.0.0.1:9233",
+        "CLOAK_BROWSER_LAUNCHD_LABEL": "ai.anicca.rockstar_ibot-upwork-browser"
+      },
+      "StartInterval": 300,
+      "ThrottleInterval": 60,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "upwork-free-loop-launchd"
+    },
+    {
+      "label": "ai.anicca.hf-gig-apply-direct",
+      "lane": "apply",
+      "summary": "Reads the coconala job board and submits applications.",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/application_direct.py",
+        "--all-eligible",
+        "--planner-runner",
+        "{{RELEASE}}/runtime/agent-runner/agent_runner.py"
+      ],
+      "env": {
+        "CLOAK_BROWSER_OWNER": "gig-apply-direct",
+        "CLOAK_CONTEXT_LEASES_FILE": "{{CLOAK_VAULT_DIR}}/gig-leases.json",
+        "CDP_LOCK_DIR": "{{GIG_STATE_DIR}}/.cdp-gig.lock",
+        "GIG_OPERATOR_BRAKE_FILE": "{{GIG_BRAKE_DIR}}/apply.operator.brake",
+        "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+        "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+        "GIG_DISK_HEADROOM_KIB": "524288"
+      },
+      "StartInterval": 60,
+      "ThrottleInterval": 60,
+      "ProcessType": "Background",
+      "log_basename": "gig-apply-direct-launchd"
+    },
+    {
+      "label": "ai.anicca.hf-gig-storefront-direct",
+      "lane": "storefront",
+      "summary": "Watches the seller storefront and edits listings that earn nothing.",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/storefront_direct.py",
+        "--effect",
+        "--auto-cadence",
+        "--full-interval-seconds",
+        "60"
+      ],
+      "env": {
+        "CLOAK_BROWSER_OWNER": "gig-storefront-direct",
+        "CLOAK_CONTEXT_LEASES_FILE": "{{CLOAK_VAULT_DIR}}/gig-leases.json",
+        "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+        "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+        "GIG_DISK_HEADROOM_KIB": "524288",
+        "GIG_OPERATOR_BRAKE_FILE": "{{GIG_BRAKE_DIR}}/storefront.operator.brake",
+        "GIG_NEGOTIATE_RUN_LOG": "{{GIG_LOG_DIR}}/gig-reply-detector-launchd.out.log",
+        "GIG_STOREFRONT_TARGET_SERVICE_ID": "{{GIG_STOREFRONT_TARGET_SERVICE_ID}}",
+        "GIG_STOREFRONT_GALLERY_SERVICE_ID": "{{GIG_STOREFRONT_GALLERY_SERVICE_ID}}",
+        "GIG_STOREFRONT_PRESENTATION_SERVICE_ID": "{{GIG_STOREFRONT_PRESENTATION_SERVICE_ID}}",
+        "GIG_STOREFRONT_SCOPE_SERVICE_ID": "{{GIG_STOREFRONT_SCOPE_SERVICE_ID}}",
+        "GIG_STOREFRONT_CAPABILITY_EVIDENCE": "{{GIG_STOREFRONT_CAPABILITY_EVIDENCE}}"
+      },
+      "StartInterval": 60,
+      "ThrottleInterval": 60,
+      "ProcessType": "Background",
+      "log_basename": "gig-storefront-direct-launchd"
+    },
+    {
+      "label": "ai.anicca.hf-gig-reply-detector",
+      "lane": "negotiate",
+      "summary": "Reads buyer threads before purchase and answers them.",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/reply_detector.py",
+        "--trigger",
+        "fallback",
+        "--runner",
+        "{{RELEASE}}/runtime/agent-runner/agent_runner.py",
+        "--runner-config",
+        "{{RELEASE}}/runtime/agent-runner/config.json",
+        "--continuous",
+        "--poll-seconds",
+        "30",
+        "--workers",
+        "2"
+      ],
+      "env": {
+        "CLOAK_BROWSER_OWNER": "gig-reply-detector",
+        "CLOAK_CONTEXT_LEASES_FILE": "{{CLOAK_VAULT_DIR}}/gig-leases.json",
+        "CLOAK_TARGET_OWNERS_FILE": "{{CLOAK_VAULT_DIR}}/gig-target-owners.json",
+        "CLOAK_SESSION_VAULT_FILE": "{{SESSION_VAULT_DIR}}/auth-state.json",
+        "SESSION_VAULT_DIR": "{{SESSION_VAULT_DIR}}",
+        "SESSION_VAULT_PORT": "{{CDP_PORT}}",
+        "CDP_LOCK_DIR": "{{GIG_STATE_DIR}}/.cdp-gig.lock",
+        "CDP_GUARD_LOCK": "{{GIG_STATE_DIR}}/.cdp-gig-guard.lock",
+        "CDP_GUARD_LOG": "{{GIG_LOG_DIR}}/cdp-gig-browser-guard.log",
+        "GIG_CDP_HEALTH_URL": "http://127.0.0.1:{{CDP_PORT}}/json/version",
+        "GIG_NO_CONTACT_REGISTRY": "{{HOME}}/.config/anicca/gig/no-contact.json",
+        "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+        "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+        "GIG_DISK_HEADROOM_KIB": "524288"
+      },
+      "KeepAlive": true,
+      "ThrottleInterval": 30,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "gig-reply-detector-launchd"
+    },
+    {
+      "label": "ai.anicca.hf-gig-paid-direct",
+      "lane": "paid",
+      "summary": "Works paid orders and judges whether they are deliverable.",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/paid_direct.py",
+        "--output",
+        "{{GIG_STATE_DIR}}/evidence/paid-direct-live/latest.json",
+        "--evidence-dir",
+        "{{GIG_STATE_DIR}}/evidence/paid-direct-live",
+        "--projects-root",
+        "{{GIG_STATE_DIR}}/projects",
+        "--lock-file",
+        "{{GIG_STATE_DIR}}/.paid-direct.lock",
+        "--cdp-lock-dir",
+        "{{GIG_STATE_DIR}}/.cdp-gig.lock"
+      ],
+      "env": {
+        "CLOAK_BROWSER_OWNER": "gig-paid-direct",
+        "CLOAK_CONTEXT_LEASES_FILE": "{{CLOAK_VAULT_DIR}}/gig-leases.json",
+        "CDP_LOCK_DIR": "{{GIG_STATE_DIR}}/.cdp-gig.lock",
+        "GIG_IGNORE_DISK_PRESSURE_BLOCK": "1",
+        "GIG_IGNORE_DISK_WRITERS_STOP": "1",
+        "GIG_OPERATOR_BRAKE_FILE": "{{GIG_BRAKE_DIR}}/paid.operator.brake",
+        "GIG_SANDBOX_DENY": "{{GIG_SANDBOX_DENY}}"
+      },
+      "StartInterval": 300,
+      "ThrottleInterval": 60,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "gig-paid-direct-launchd"
+    },
+    {
+      "label": "ai.anicca.article-daily",
+      "lane": "writer-creator",
+      "summary": "Runs the bounded Writer creator from the immutable Rockstar_ibot release.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/article-daily.sh"
+      ],
+      "StartCalendarInterval": {"Hour": 6, "Minute": 0},
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "article-daily"
+    },
+    {
+      "label": "ai.anicca.article-resume",
+      "lane": "writer-resume",
+      "summary": "Resumes pending Writer destinations without creating a new run.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/article-resume-pending.sh"
+      ],
+      "StartInterval": 300,
+      "ProcessType": "Background",
+      "log_basename": "article-resume"
+    },
+    {
+      "label": "ai.anicca.article-zenn-retry",
+      "lane": "writer-zenn",
+      "summary": "Retries only the deferred Zenn destination from durable Writer state.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/zenn-deferred-worker.sh"
+      ],
+      "StartInterval": 300,
+      "ProcessType": "Background",
+      "log_basename": "article-zenn-retry"
+    },
+    {
+      "label": "ai.anicca.article-healthcheck",
+      "lane": "writer-health",
+      "summary": "Checks whether the daily Writer creator produced a terminal receipt.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/article-healthcheck.sh"
+      ],
+      "env": {
+        "ARTICLE_HEALTHCHECK_STATE_DIR": "{{WRITER_STATE_DIR}}/healthcheck",
+        "ARTICLE_DAILY_LOG": "{{WRITER_LOG_DIR}}/article-daily.log"
+      },
+      "StartInterval": 300,
+      "ProcessType": "Background",
+      "log_basename": "article-healthcheck"
+    },
+    {
+      "label": "ai.anicca.writer-claim-loop",
+      "lane": "writer-demand",
+      "summary": "Supplies demand cards for the Writer creator.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/writer-agent/scripts/claim_loop.py",
+        "--skill-dir",
+        "{{RELEASE}}/skills/writer-agent",
+        "--state-dir",
+        "{{WRITER_STATE_DIR}}"
+      ],
+      "StartInterval": 900,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-claim-loop"
+    },
+    {
+      "label": "ai.anicca.writer-money-sync",
+      "lane": "writer-money",
+      "summary": "Joins verified publisher and payment receipts into the Writer ledger.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/writer-agent/scripts/money_sync.py",
+        "--state-dir",
+        "{{WRITER_STATE_DIR}}",
+        "--db",
+        "{{WRITER_STATE_DIR}}/money.sqlite3"
+      ],
+      "StartInterval": 300,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-money-sync"
+    },
+    {
+      "label": "ai.anicca.writer-opportunity-discovery",
+      "lane": "writer-opportunity-discovery",
+      "summary": "Discovers and records publisher opportunities for later demand cards.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/writer-agent/scripts/opportunity_discovery.py",
+        "--db",
+        "{{WRITER_STATE_DIR}}/opportunities.sqlite3",
+        "--claims-db",
+        "{{WRITER_STATE_DIR}}/claims.sqlite3",
+        "--receipt",
+        "{{WRITER_STATE_DIR}}/opportunity-discovery-latest.json",
+        "--runner",
+        "{{RELEASE}}/skills/writer-agent/runtime/model-runner.sh"
+      ],
+      "StartInterval": 86400,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-opportunity-discovery"
+    },
+    {
+      "label": "ai.anicca.writer-opportunity-response",
+      "lane": "writer-opportunity-response",
+      "summary": "Responds to eligible publisher opportunities using the Writer identity gate.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/writer-agent/scripts/opportunity_response.py",
+        "--db",
+        "{{WRITER_STATE_DIR}}/opportunities.sqlite3",
+        "--receipt",
+        "{{WRITER_STATE_DIR}}/opportunity-response-latest.json",
+        "--runner",
+        "{{RELEASE}}/skills/writer-agent/runtime/model-runner.sh"
+      ],
+      "env": {"WRITER_GMAIL_ACCOUNT": "{{WRITER_GMAIL_ACCOUNT}}"},
+      "StartInterval": 900,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-opportunity-response"
+    },
+    {
+      "label": "ai.anicca.writer-report",
+      "lane": "writer-report",
+      "summary": "Renders neutral natural-language Writer progress and money reports.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/writer-agent/scripts/writer_report_worker.py",
+        "--state-dir",
+        "{{WRITER_STATE_DIR}}"
+      ],
+      "StartInterval": 300,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-report"
+    },
+    {
+      "label": "ai.anicca.writer-sales-measure",
+      "lane": "writer-sales",
+      "summary": "Collects publisher-native sales observations without converting unknown to zero.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/writer-sales-measure-worker.sh"
+      ],
+      "StartInterval": 3600,
+      "RunAtLoad": true,
+      "ProcessType": "Background",
+      "log_basename": "writer-sales-measure"
+    },
+    {
+      "label": "ai.anicca.writer-craft-train",
+      "lane": "writer-craft",
+      "summary": "Runs the Writer craft trainer after the daily learning window.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "-c",
+        "{{RELEASE}}/skills/writer-agent/scripts/craft-train.sh; {{RELEASE}}/skills/writer-agent/scripts/craft-train-notify.sh"
+      ],
+      "env": {
+        "CRAFT_MD": "{{RELEASE}}/skills/writer-agent/reference/CRAFT.md",
+        "CRAFT_TRAIN_JSONL": "{{WRITER_STATE_DIR}}/craft-train.jsonl",
+        "CRAFT_TRAIN_RUNS_ROOT": "{{WRITER_STATE_DIR}}/runs",
+        "CRAFT_TRAIN_TELEGRAM": "{{WRITER_TELEGRAM_TARGET}}"
+      },
+      "StartCalendarInterval": {"Hour": 23, "Minute": 10},
+      "ProcessType": "Background",
+      "log_basename": "writer-craft-train"
+    },
+    {
+      "label": "ai.anicca.article-self-improve",
+      "lane": "writer-self-improve",
+      "summary": "Runs the evidence-bound Writer learning controller.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/self-improve.sh"
+      ],
+      "StartCalendarInterval": {"Hour": 22, "Minute": 30},
+      "ProcessType": "Background",
+      "log_basename": "article-self-improve"
+    },
+    {
+      "label": "ai.anicca.article-audit-7day",
+      "lane": "writer-audit",
+      "summary": "Runs the weekly Writer quality and publication audit.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/audit-7day.sh"
+      ],
+      "StartCalendarInterval": {"Weekday": 0, "Hour": 22, "Minute": 0},
+      "ProcessType": "Background",
+      "log_basename": "article-audit-7day"
+    },
+    {
+      "label": "ai.anicca.article-learn-whitelist",
+      "lane": "writer-whitelist",
+      "summary": "Runs the weekly evidence-bound language whitelist learning job.",
+      "env_profile": "writer",
+      "program": [
+        "{{PYTHON}}",
+        "{{RELEASE}}/skills/earn/gig/scripts/gig_disk_guard.py",
+        "/bin/bash",
+        "{{RELEASE}}/skills/writer-agent/scripts/learn-whitelist.sh"
+      ],
+      "env": {"ARTICLE_SOURCE_BRANCH": "main"},
+      "StartCalendarInterval": {"Weekday": 0, "Hour": 3, "Minute": 0},
+      "ProcessType": "Background",
+      "log_basename": "article-learn-whitelist"
+    },
+    {
+      "label": "ai.anicca.hf-gig-release-watch",
+      "lane": "release",
+      "summary": "Fast-forwards the checkout to origin/main and moves idle lanes onto the new release.",
+      "_warning": "The only job that runs from the checkout rather than a release -- it has to fetch. gig_release.py leaves it alone unless you name it, since booting it out mid-tick would kill the switch it is performing.",
+      "program": [
+        "{{PYTHON}}",
+        "{{CHECKOUT}}/skills/earn/gig/scripts/gig_release.py",
+        "watch"
+      ],
+      "env": {},
+      "StartInterval": 300,
+      "ThrottleInterval": 60,
+      "ProcessType": "Background",
+      "log_basename": "gig-release-watch-launchd"
+    },
+    {
+      "label": "ai.anicca.hf-gig-browser",
+      "lane": "browser",
+      "summary": "Keeps the one logged-in Chromium the four lanes share on the CDP port.",
+      "_warning": "Reloading this evicts every lane's browser session. gig_release.py leaves it alone unless you name it explicitly.",
+      "program": [
+        "/bin/bash",
+        "{{RELEASE}}/skills/earn/gig/scripts/launch_gig_browser.sh"
+      ],
+      "env": {
+        "GIG_BROWSER_PORT": "{{CDP_PORT}}",
+        "GIG_BROWSER_PROFILE": "{{CDP_DAILY_DRIVER_PROFILE}}",
+        "GIG_BROWSER_FINGERPRINT": "{{GIG_BROWSER_FINGERPRINT}}",
+        "GIG_BROWSER_TLS_COMPAT": "{{GIG_BROWSER_TLS_COMPAT}}",
+        "GIG_DISK_HEADROOM_KIB": "524288"
+      },
+      "RunAtLoad": true,
+      "KeepAlive": true,
+      "ThrottleInterval": 30,
+      "ProcessType": "Background",
+      "log_basename": "gig-browser-launchd"
+    }
+  ]
+}

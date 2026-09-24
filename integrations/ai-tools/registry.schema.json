@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/k999ln/Mr./main/integrations/ai-tools/registry.schema.json",
+  "title": "Rockstar_ibot operator-owned AI tool registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "entries"],
+  "properties": {
+    "$schema": { "type": "string", "const": "./registry.schema.json" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "serverName",
+          "directory",
+          "entryKind",
+          "state",
+          "manifestSha256",
+          "publisher",
+          "review",
+          "enabledCapabilities"
+        ],
+        "properties": {
+          "serverName": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9.-]+/[A-Za-z0-9._-]+$"
+          },
+          "directory": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+          },
+          "entryKind": { "type": "string", "enum": ["template", "package"] },
+          "state": {
+            "type": "string",
+            "enum": ["catalog_only", "approved", "disabled", "revoked"]
+          },
+          "manifestSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "artifactSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "publisher": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "displayName", "status"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+              },
+              "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "status": { "type": "string", "enum": ["unverified", "verified", "rejected"] }
+            }
+          },
+          "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["security", "signature"],
+            "properties": {
+              "security": { "type": "string", "enum": ["unreviewed", "reviewed", "rejected"] },
+              "signature": { "type": "string", "enum": ["not_required_template", "unverified", "verified", "invalid"] },
+              "reviewedAt": { "type": "string", "format": "date-time" }
+            }
+          },
+          "enabledCapabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "featureName": "dispatcher-live-dormant-mode",
+  "mode": "lean",
+  "language": "python",
+  "currentPhase": "complete",
+  "phaseHistory": [
+    {
+      "from": "init",
+      "to": "1a",
+      "timestamp": "2026-07-01T08:53:26.946Z"
+    },
+    {
+      "from": "1a",
+      "to": "1b",
+      "timestamp": "2026-07-01T08:53:26.950Z"
+    },
+    {
+      "from": "1b",
+      "to": "1c",
+      "timestamp": "2026-07-01T09:02:16.986Z"
+    },
+    {
+      "from": "1c",
+      "to": "2a",
+      "timestamp": "2026-07-01T09:02:16.995Z",
+      "sprint": 1
+    },
+    {
+      "from": "2a",
+      "to": "2b",
+      "timestamp": "2026-07-01T09:09:34.984Z",
+      "sprint": 1
+    },
+    {
+      "from": "2b",
+      "to": "2c",
+      "timestamp": "2026-07-01T09:09:34.989Z",
+      "sprint": 1
+    },
+    {
+      "from": "2c",
+      "to": "3",
+      "timestamp": "2026-07-01T09:12:18.589Z",
+      "sprint": 1
+    },
+    {
+      "from": "3",
+      "to": "5",
+      "timestamp": "2026-07-01T09:12:18.594Z",
+      "sprint": 1
+    },
+    {
+      "from": "5",
+      "to": "6",
+      "timestamp": "2026-07-01T09:13:13.808Z",
+      "sprint": 1
+    },
+    {
+      "from": "6",
+      "to": "complete",
+      "timestamp": "2026-07-01T09:13:36.609Z",
+      "sprint": 1
+    }
+  ],
+  "iterations": {
+    "3": 1,
+    "5": 1,
+    "6": 1,
+    "1a": 1,
+    "1b": 1,
+    "1c": 1,
+    "2a": 1,
+    "2b": 1,
+    "2c": 1,
+    "complete": 1
+  },
+  "proofObligations": [],
+  "traceability": {
+    "epicId": "VCSDD-dispatcher-live-dormant-mode-1782895955166",
+    "beads": []
+  },
+  "gates": {
+    "3": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T09:12:10.272Z",
+      "reviewedBy": "adversary"
+    },
+    "5": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T09:12:56.475Z",
+      "reviewedBy": "verifier"
+    },
+    "1c": {
+      "verdict": "PASS",
+      "timestamp": "2026-07-01T09:02:10.585Z",
+      "reviewedBy": "adversary",
+      "adversaryVerdict": "PASS",
+      "adversaryReviewedAt": "2026-07-01T09:02:10.585Z"
+    }
+  },
+  "sprintCount": 1,
+  "createdAt": "2026-07-01T08:52:35.165Z",
+  "updatedAt": "2026-07-01T09:13:36.610Z"
+}

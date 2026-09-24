@@ -1,0 +1,102 @@
+
+__pycache__/
+.DS_Store
+._*
+**/._*
+.deepeval/
+.deepeval_telemetry.txt
+.env
+.local-backups/
+.worktrees/
+.netlify/
+.playwright-cli/
+*.b64
+*.env
+*.mov
+*.mp4
+*.pyc
+*.sqlite
+**/node_modules/
+# Auth (secrets)
+# Binary / media (too large for git)
+# Git worktrees (transient)
+# Large workspace generated assets (renderings, slides, UGC)
+# Node modules
+# Personal data (single source) — never commit
+# Sessions & logs (large, regenerated)
+# Workspace generated media (PNGs in work dirs)
+agents/*/agent/auth-profiles.json
+agents/*/sessions/*.jsonl
+agents/*/sessions/*.jsonl.deleted.*
+agents/*/sessions/*.jsonl.reset.*
+agents/*/sessions/sessions.json
+cron/runs/*.jsonl
+identity/profile.json
+identity/scrub-patterns.json
+logs/*.log
+media/inbound/*
+skills/_shared/venv-cloak/
+skills/*/.venv/
+skills/*/data/
+skills/*/pdfs/
+skills/*/queue/
+skills/*/state/
+skills/*/*/state/
+skills/*/*/logs/
+skills/*/*/reviews/*/output/
+skills/*/*/evidence/**/*.log
+skills/*/*/evidence/**/promotion_verdict.json
+skills/*/*/evidence/**/pytest_output*.txt
+skills/*/*/evidence/**/real_run_*
+skills/*/*/evidence/**/observe_ledger_summary.json
+skills/*/state/MNEMONIC_BACKUP_ONCE.txt
+skills/*/state/wallet.encrypted
+skills/earn/polymarket-trade/*.log
+skills/*/work/
+workspace/mau-tiktok/cta-video/
+workspace/mau-tiktok/hooks/
+workspace/mau-tiktok/output/
+workspace/tiktok-marketing/assets/6-slide-images/
+workspace/tiktok-marketing/posts/
+workspace/tiktok-marketing/ugc-library/
+workspace/tiktok-marketing/ugc-library/**/*.mov
+workspace/tiktok-marketing/ugc-library/**/*.mp4
+workspace/tiktok-marketing/work-*/
+workspace/tiktok-marketing/work/
+workspace/tiktok-marketing/work/**/*.mov
+workspace/tiktok-marketing/work/**/*.mp4
+workspace/tiktok-marketing/work/**/*.png
+workspace/ugc-library/
+workspace/ugc-library/**/*.mov
+workspace/ugc-library/**/*.mp4
+services/x402-worker/state/
+services/x402-endpoint/node_modules/
+services/facilitator/state/
+# Retired local submodule checkout paths; runtime never reads these.
+/services/facilitator/x402-rs/
+/services/inbox-zero/
+skills/earn/hl-trade/.venv/
+skills/earn/bounty/state/superteam-creds.json
+*.creds.json
+skills/earn/bounty/state/frantic-creds.json
+/taskmarket-deliveries/
+# Per-account Capafy listing artwork; generated outside the OSS runtime.
+skills/capafy-autopublish/assets/
+# Capafy publisher/user credentials and browser staging are local-only.
+skills/capafy-autopublish/vendor/capafy-publisher/config.json
+skills/capafy-autopublish/vendor/capafy-user/config.json
+skills/capafy-autopublish/vendor/capafy-publisher/.temp/
+skills/capafy-autopublish/vendor/capafy-user/.temp/
+
+# Deliberate local-only compose enablement (never a repo default).
+deploy/local/compose.override.yaml
+
+# Operator-only external AI discovery results; never publish or commit.
+integrations/ai-tools/discovery/*-candidates.json
+integrations/ai-tools/discovery/runs/
+
+# Vercel CLI state and short-lived local credentials.
+.vercel/
+.env.local
+# Local executor connection metadata (credentials are in Keychain).
+/.mr-executor.json

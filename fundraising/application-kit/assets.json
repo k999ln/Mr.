@@ -1,0 +1,38 @@
+{
+  "context_version": "2026-09-05.1",
+  "context_digest": "d55d19317e70a89a3bed04e947137f625d3ee78c6805996463e4fcf6a5b1640b",
+  "assets": [
+    {
+      "type": "telegram",
+      "status": "verified",
+      "url": "https://t.me/avocadominibot"
+    },
+    {
+      "type": "demo",
+      "status": "verified",
+      "url": "https://effect-os-verified.kirin-999.chatgpt.site/start"
+    }
+  ],
+  "excluded": [
+    {
+      "type": "product",
+      "status": "verified_owner_only",
+      "reason": "Sites ownership readback identified Kai as owner; access is owner-only, so this URL is not a public fundraising attachment."
+    },
+    {
+      "type": "repository",
+      "status": "verified_owner_only",
+      "reason": "The trailing-dot k999ln/Mr. repository is the private canonical repository. The k999ln connector has ADMIN permission and the local noellesugar99 collaborator has WRITE permission. It is not a public fundraising attachment."
+    },
+    {
+      "type": "dashboard",
+      "status": "unconfigured",
+      "reason": "No Kai-owned public dashboard is configured."
+    },
+    {
+      "type": "founder_video",
+      "status": "unverified",
+      "reason": "No Kai-owned founder video has been verified."
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "featureName": "earn-shared-skeleton",
+  "mode": "lean",
+  "currentPhase": "4",
+  "phaseHistory": [
+    {
+      "from": "init",
+      "to": "1a",
+      "timestamp": "2026-06-30T15:18:43.931Z"
+    },
+    {
+      "from": "1a",
+      "to": "1b",
+      "timestamp": "2026-06-30T15:18:43.934Z"
+    },
+    {
+      "from": "1b",
+      "to": "1c",
+      "timestamp": "2026-06-30T15:47:21.683Z"
+    },
+    {
+      "from": "1c",
+      "to": "2a",
+      "timestamp": "2026-06-30T15:52:23.254Z",
+      "sprint": 1
+    },
+    {
+      "from": "2a",
+      "to": "2b",
+      "timestamp": "2026-06-30T18:24:15.525Z",
+      "sprint": 1
+    },
+    {
+      "from": "2b",
+      "to": "2c",
+      "timestamp": "2026-06-30T18:29:35.239Z",
+      "sprint": 1
+    },
+    {
+      "from": "2c",
+      "to": "3",
+      "timestamp": "2026-06-30T18:39:17.226Z",
+      "sprint": 1
+    },
+    {
+      "from": "3",
+      "to": "4",
+      "timestamp": "2026-06-30T18:40:54.070Z",
+      "sprint": 1
+    }
+  ],
+  "iterations": {
+    "3": 1,
+    "4": 1,
+    "1a": 1,
+    "1b": 1,
+    "1c": 1,
+    "2a": 1,
+    "2b": 1,
+    "2c": 1
+  },
+  "proofObligations": [],
+  "traceability": {
+    "epicId": "VCSDD-earn-shared-skeleton-1782832528622",
+    "beads": []
+  },
+  "gates": {
+    "3": {
+      "verdict": "PASS",
+      "timestamp": "2026-06-30T18:55:52.468Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "sprintNumber": 1,
+        "iteration": 3,
+        "iter1_findings": 18,
+        "iter2_findings": 5,
+        "iter3_findings": 0,
+        "trajectory_note": "Phase 3 sprint-1 converged in lean-mode 3-iteration cap. Sprint-1 ships verification layer (142 tests + 11 lib modules) + glue scaffolding (12 shell scripts + 4 trust-anchor files). 13 scope-deferred items committed to sprint-2 with concrete acceptance criteria per finding."
+      }
+    },
+    "6": {
+      "verdict": "PASS",
+      "timestamp": "2026-06-30T20:11:09.874Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "sprintNumber": 1,
+        "finding_trajectory": {
+          "spec_1c": [
+            15,
+            2,
+            3,
+            0,
+            3,
+            0
+          ],
+          "impl_3": [
+            18,
+            5,
+            0
+          ]
+        },
+        "artifacts": [
+          "verification-report.md",
+          "security-report.md",
+          "purity-audit.md",
+          "security-results/"
+        ],
+        "scope_deferred_to_sprint_2": 13,
+        "test_count": 142
+      }
+    },
+    "1c": {
+      "verdict": "PASS",
+      "timestamp": "2026-06-30T18:16:20.224Z",
+      "reviewedBy": "adversary",
+      "details": {
+        "iteration": 6,
+        "iter1_findings": 15,
+        "iter2_findings": 2,
+        "iter3_findings": 3,
+        "iter4_findings": 0,
+        "iter5_findings": 3,
+        "iter6_findings": 0,
+        "reverse_note": "iter-4 PASSed apparent but architect (= main agent) self-reversed under HARD 0.36 to remove human-touch paths; iter-5 caught residuals; iter-6 PASSed genuinely"
+      },
+      "adversaryVerdict": "PASS",
+      "adversaryReviewedAt": "2026-06-30T18:16:20.224Z"
+    }
+  },
+  "sprintCount": 1,
+  "createdAt": "2026-06-30T15:15:28.620Z",
+  "updatedAt": "2026-06-30T20:11:09.876Z"
+}

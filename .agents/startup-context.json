@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "context_version": "2026-09-05.1",
+  "updated_at": "2026-09-05T02:01:00+09:00",
+  "owner": {
+    "display_name": "Kai",
+    "github_login": "k999ln",
+    "source": "user_choice_plus_github_connector_admin_and_local_cli_write_readback"
+  },
+  "product": {
+    "name": "Rockstar_ibot",
+    "usage": "Use as the product name in every public product and fundraising field.",
+    "one_liner": "A proactive general agent that manages your body, mind, and money, follows through in the real world, and coordinates verified essentials support through human-approved, vendor-direct provision rather than recipient cash payouts.",
+    "mission": "End suffering for humans and, ultimately, all living beings by making dependable care, agency, and verified access to essentials continuously available.",
+    "vision": "Rockstar_ibot grows from managing one human life across physical health, mental wellbeing, finances, work, and schedules into a general manager and essentials-distribution network for every living being.",
+    "organs": [
+      {
+        "id": "daily",
+        "label": "Daily Organ",
+        "responsibility": "Coordinates schedules, applications, priorities, and completed actions."
+      },
+      {
+        "id": "physical_mental",
+        "label": "Physical / Mental Organ",
+        "responsibility": "Supports physical routines, mental wellbeing, and continuity of care."
+      },
+      {
+        "id": "financial",
+        "label": "Financial Organ",
+        "responsibility": "Tracks net worth, cash flow, expenses, income opportunities, and risk-managed investing."
+      }
+    ],
+    "support_programs": [
+      {
+        "id": "essentials_distribution",
+        "label": "Essentials Distribution",
+        "responsibility": "Validates privacy-minimized in-kind support requests and prepares procurement only after recipient consent, an authorized human or partner need assessment, and verified-vendor evidence; it never pays cash or cash-like instruments to recipients."
+      }
+    ]
+  },
+  "company": {
+    "legal_name": null,
+    "status": "unconfigured",
+    "usage": "Do not name a company or legal entity until Kai provides and verifies it."
+  },
+  "delivery": {
+    "local": "Free, open-source, self-hosted Rockstar_ibot.",
+    "cloud": "A future paid monthly option for an always-on hosted Rockstar_ibot; pricing and billing are not configured."
+  },
+  "traction": {
+    "current_owner_revenue": {
+      "display": "not yet verified",
+      "status": "unverified",
+      "source": "none",
+      "evidence": "No receipt-backed Rockstar_ibot revenue claim has been verified for Kai."
+    }
+  },
+  "application_answers": {
+    "one_word": "Agency",
+    "short_description": "Proactive general agent for your whole life",
+    "problem": "A person's health, mental wellbeing, money, schedules, work, and access to basic necessities are fragmented across tools and organizations. Advice and cash-only promises do not guarantee that the needed food, shelter, care, communication, or transport actually arrives.",
+    "solution": "Rockstar_ibot coordinates specialist organs, acts within delegated boundaries, verifies outcomes with receipts, and adds an essentials-only support workflow: a human or partner verifies recipient consent and need, a verified vendor receives the order, and purchase, dispatch, and receipt are tracked separately.",
+    "why_building": "Kai is building one dependable manager that does not stop at advice and can carry real goals through disconnected systems. The long-term mission is to reduce suffering by making agency and verified access to necessities continuously available without handing recipients cash or cash-like instruments.",
+    "progress": "The local runtime, owner-only Hub, Kai-owned private GitHub repository, public avocadomini site, Kai-owned @avocadominibot Webhook and command profile, Supabase durable job queue, Railway Core, Mac Codex bridge, multiple specialist loops, essentials-only request policy and planner, and a purpose-gated vendor bank-request builder exist. Real-user Telegram-to-Codex message receipts, bot-token rotation, automatic GitHub deployment credentials, Kai-owned live bank credentials, procurement vendors, delivery providers, billing, and receipt-backed revenue are not yet verified.",
+    "market": "The initial users are founders and professionals whose lives and work span many disconnected systems. The broader market is anyone who needs trusted execution across health, work, and finances; do not invent a numeric TAM without current sourced evidence.",
+    "business_model": "A free self-hosted option can drive trust and adoption. An always-on hosted Rockstar_ibot may become a paid monthly subscription after Kai-owned billing and delivery are verified. Any support funding is restricted to approved vendor procurement and is not paid to recipients.",
+    "differentiation": "Rockstar_ibot is a manager rather than a chat assistant or dashboard: it takes authorized action, coordinates specialized agents, preserves provenance, and distinguishes attempts from provider-verified completion.",
+    "how_built": "One general-agent harness uses models for semantic judgment and unfamiliar interfaces, while deterministic code owns permissions, money arithmetic, state transitions, deduplication, receipts, and scheduling.",
+    "use_of_funds": "Improve reliable agent execution, expand secure integrations, build privacy-protected needs intake, connect verified procurement and delivery partners, strengthen receipt-backed verification, and deliver the always-on cloud product to early users."
+  },
+  "links": {
+    "product": {
+      "url": "https://life-manager-one-hub.kirin-999.chatgpt.site",
+      "status": "verified_owner_only",
+      "expected_text": "Rockstar_ibot",
+      "verified_at": "2026-08-28T00:00:00-04:00",
+      "evidence": "Sites ownership readback identified Kai as owner; access is owner-only, so this URL is not a public fundraising attachment."
+    },
+    "repository": {
+      "url": "https://github.com/k999ln/Mr.",
+      "status": "verified_owner_only",
+      "expected_text": "Rockstar_ibot",
+      "verified_at": "2026-09-05T02:01:00+09:00",
+      "evidence": "The trailing-dot k999ln/Mr. repository is the private canonical repository. The k999ln connector has ADMIN permission and the local noellesugar99 collaborator has WRITE permission. It is not a public fundraising attachment."
+    },
+    "telegram": {
+      "url": "https://t.me/avocadominibot",
+      "status": "verified",
+      "expected_text": "avocadomini",
+      "verified_at": "2026-09-05T02:01:00+09:00",
+      "evidence": "Telegram getMe verified @avocadominibot. getWebhookInfo verified the Railway Webhook with zero pending updates and no last error, and the six-command public profile matched official API readback."
+    },
+    "dashboard": {
+      "url": null,
+      "status": "unconfigured",
+      "verified_at": null,
+      "evidence": "No Kai-owned public dashboard is configured."
+    },
+    "demo": {
+      "url": "https://effect-os-verified.kirin-999.chatgpt.site/start",
+      "status": "verified",
+      "expected_text": "avocadomini",
+      "verified_at": "2026-09-05T02:01:00+09:00",
+      "evidence": "Kai-owned Codex Sites avocadomini deployment returned HTTP 200 and exposed the ten-tool, one-to-three-selection Telegram journey."
+    },
+    "founder_video": {
+      "url": null,
+      "status": "unverified",
+      "verified_at": null,
+      "evidence": "No Kai-owned founder video has been verified."
+    }
+  },
+  "claims": [
+    {
+      "id": "repository-destination",
+      "topic": "public_presence",
+      "statement": "The Kai-owned k999ln/Mr. repository is the private canonical repository and the connected GitHub session has push permission.",
+      "source": "github_provider_readback",
+      "status": "verified",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "prohibited",
+      "evidence": [
+        "GitHub provider readback returned visibility PRIVATE and push permission for k999ln/Mr.."
+      ]
+    },
+    {
+      "id": "telegram-configuration",
+      "topic": "public_presence",
+      "statement": "Kai's installation-owned public Telegram entry point is @avocadominibot; its Railway Webhook and six-command avocadomini profile are verified, while real-user Telegram-to-Codex message receipts remain pending.",
+      "source": "telegram_getMe_getWebhookInfo_and_profile_readback",
+      "status": "verified",
+      "as_of": "2026-09-05T02:01:00+09:00",
+      "public_use": "allowed",
+      "evidence": [
+        "Telegram official API readback returned @avocadominibot, the Railway Webhook, pending update count zero, no last error, and the canonical public command profile."
+      ]
+    },
+    {
+      "id": "mission-direction",
+      "topic": "mission",
+      "statement": "End suffering for humans and, ultimately, all living beings by making dependable care, agency, and verified access to essentials continuously available.",
+      "source": "owner_direction",
+      "status": "aspirational",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "allowed_with_status",
+      "evidence": [
+        "Canonical product mission; this is a direction, not an achieved outcome."
+      ]
+    },
+    {
+      "id": "essentials-only-support-direction",
+      "topic": "mission",
+      "statement": "Rockstar_ibot's recipient-support direction is verified essential goods or provider-delivered services through recipient consent, human- or partner-approved vendor procurement, and receipt tracking—not cash, bank payout, crypto, or cash-like instruments to aid recipients. Bank transfers remain available for verified vendors, business expenses, and customer refunds.",
+      "source": "owner_direction",
+      "status": "aspirational",
+      "as_of": "2026-08-28T16:00:00-04:00",
+      "public_use": "allowed_with_status",
+      "evidence": [
+        "Owner direction recorded on 2026-08-28; policy, intake planner, and purpose-gated vendor bank-request builder are implemented, while live bank credentials, procurement, and delivery providers remain unconfigured."
+      ]
+    },
+    {
+      "id": "current-owner-revenue",
+      "topic": "revenue",
+      "statement": "No receipt-backed Rockstar_ibot revenue claim has been verified for Kai.",
+      "source": "none",
+      "status": "unsupported",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "prohibited",
+      "evidence": [
+        "Current-owner traction is explicitly marked unverified."
+      ]
+    },
+    {
+      "id": "user-count",
+      "topic": "users",
+      "statement": "No verified public user-count claim is available.",
+      "source": "none",
+      "status": "unsupported",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "prohibited",
+      "evidence": [
+        "No current provider or analytics receipt is present in the canonical startup context."
+      ]
+    },
+    {
+      "id": "application-outcomes",
+      "topic": "applications",
+      "statement": "Application submissions, acceptances, and admissions require a current program-provider receipt.",
+      "source": "provider_receipt_required",
+      "status": "unverified_dynamic",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "prohibited",
+      "evidence": [
+        "Dynamic fundraiser execution state is intentionally excluded from this canonical public context."
+      ]
+    },
+    {
+      "id": "agi-achievement",
+      "topic": "agi",
+      "statement": "Rockstar_ibot is being built toward general agency; AGI is not claimed as an achieved scientific result.",
+      "source": "product_direction",
+      "status": "aspirational_not_achieved",
+      "as_of": "2026-08-28T00:00:00-04:00",
+      "public_use": "allowed_with_status",
+      "evidence": [
+        "Canonical product contract distinguishes mission and direction from achieved capability."
+      ]
+    }
+  ],
+  "claim_guards": [
+    {
+      "id": "achieved-agi",
+      "pattern": "\\b(?:(?:is|became|becomes|achieved|has achieved)\\s+(?:an?\\s+)?AGI|(?:world(?:'s|’s) first|the first)\\s+AGI)\\b"
+    },
+    {
+      "id": "numeric-users",
+      "pattern": "\\b\\d[\\d,]*(?:\\.\\d+)?\\s+(?:users?|customers?)\\b"
+    },
+    {
+      "id": "unverified-application-outcome",
+      "pattern": "\\b(?:accepted|admitted|selected|submitted)\\s+(?:to|into|by|for)\\b"
+    },
+    {
+      "id": "unverified-revenue",
+      "pattern": "(?:revenue|MRR|ARR)[^\\n]{0,40}(?:\\$|USD|USDC|¥|JPY)\\s*\\d"
+    }
+  ],
+  "forbidden_exact_values": {
+    "product_names": [
+      "Anicca"
+    ],
+    "repositories": [
+      "https://github.com/Daisuke134/anicca-oss",
+      "https://github.com/Daisuke134/life-manager"
+    ],
+    "homepages": [
+      "https://life-call-production.up.railway.app",
+      "https://aniccaai.com/lm"
+    ],
+    "telegram_handles": [
+      "LifeManagerBotbot"
+    ]
+  },
+  "public_field_allowlist": [
+    "owner",
+    "product",
+    "company.status",
+    "delivery",
+    "application_answers",
+    "links.product",
+    "links.repository",
+    "links.telegram",
+    "links.demo",
+    "claims"
+  ]
+}
