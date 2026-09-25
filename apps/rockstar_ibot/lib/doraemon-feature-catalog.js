@@ -36,14 +36,37 @@ const DORAEMON_FEATURE_CATALOG = Object.freeze(tools.map((tool) => Object.freeze
   effectClass: tool.effect_class,
   approval: tool.owner_approval,
   receiptRequired: tool.receipt_required,
+  connectorKeys: tool.connector_keys,
+  capabilityIds: tool.capability_ids,
 })));
 
 const FEATURE_BY_KEY = Object.freeze(Object.fromEntries(
   DORAEMON_FEATURE_CATALOG.map((feature) => [feature.key, feature]),
 ));
 
+const IMPLEMENTATION_STATE_LABELS = Object.freeze({
+  catalog_only: "準備中",
+  foundation: "下書き対応",
+  implemented_unconfigured: "下書き対応・接続待ち",
+  runtime_ready: "実行可能",
+});
+
+function featureStatus(feature) {
+  const state = String(feature && feature.implementationState || "catalog_only");
+  const label = IMPLEMENTATION_STATE_LABELS[state] || IMPLEMENTATION_STATE_LABELS.catalog_only;
+  const connectorKeys = Array.isArray(feature && feature.connectorKeys) ? feature.connectorKeys : [];
+  return Object.freeze({
+    state,
+    label,
+    canDraft: state !== "catalog_only",
+    connectorKeys: Object.freeze([...connectorKeys]),
+  });
+}
+
 module.exports = {
   EXPECTED_FEATURE_KEYS,
   DORAEMON_FEATURE_CATALOG,
   FEATURE_BY_KEY,
+  IMPLEMENTATION_STATE_LABELS,
+  featureStatus,
 };

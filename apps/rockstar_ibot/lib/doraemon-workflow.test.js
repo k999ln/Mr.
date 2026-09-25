@@ -26,6 +26,9 @@ test("all ten tools have a bounded draft workflow and a parseable ForceReply mar
     const built = buildDoraemonPrompt(key, "これを手伝って");
     assert.match(built, new RegExp(FEATURE_NAMES[key]));
     assert.match(built, /外部への公開・送信・決済/);
+    assert.match(built, /実行状態は/);
+    assert.match(built, /入力の目安/);
+    assert.match(built, /返す成果物/);
     assert.match(built, /利用者からの依頼/);
   }
 });

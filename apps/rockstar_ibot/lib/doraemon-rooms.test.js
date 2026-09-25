@@ -11,6 +11,7 @@ const {
   mainRoomMessage,
   mainRoomKeyboard,
   roomKeyboard,
+  toolRoomMessage,
   allToolsMessage,
   selectionKeyboard,
   parseRoomCallback,
@@ -30,6 +31,17 @@ test("all ten website tools have a complete Telegram room", () => {
   }
   const text = allToolsMessage(["request"]);
   for (const key of FEATURE_KEYS) assert.match(text, new RegExp(FEATURE_ROOMS[key].summary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("Telegram tool rooms show honest readiness and connector boundaries", () => {
+  const draftRoom = toolRoomMessage("course", ["course"]);
+  assert.match(draftRoom, /下書き対応/);
+  assert.match(draftRoom, /外部操作は行わず、下書きで止まります/);
+  assert.match(draftRoom, /brain-import, lms/);
+
+  const connectedRoom = toolRoomMessage("request", ["request"]);
+  assert.match(connectedRoom, /下書き対応・接続待ち/);
+  assert.match(connectedRoom, /telegram/);
 });
 
 test("room callback state preserves one to three selected tools", () => {

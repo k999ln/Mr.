@@ -5,7 +5,7 @@ const {
   FEATURE_NAMES,
   MAX_FEATURE_SELECTIONS,
 } = require("./doraemon-feature-selection.js");
-const { FEATURE_BY_KEY } = require("./doraemon-feature-catalog.js");
+const { FEATURE_BY_KEY, featureStatus } = require("./doraemon-feature-catalog.js");
 
 const FEATURE_ROOMS = Object.freeze(Object.fromEntries(FEATURE_KEYS.map((key) => {
   const feature = FEATURE_BY_KEY[key];
@@ -79,11 +79,21 @@ function mainRoomKeyboard(keys) {
 function toolRoomMessage(key, keys) {
   const room = FEATURE_ROOMS[key];
   if (!room) return null;
+  const feature = FEATURE_BY_KEY[key];
+  const status = featureStatus(feature);
   const selected = normalizeKeys(keys).includes(key);
   return [
     `${room.emoji} <b>${FEATURE_NAMES[key]}の部屋</b>${selected ? "　✅ 選択中" : ""}`,
     "",
     room.summary,
+    "",
+    `<b>現在の状態</b>：${status.label}`,
+    status.canDraft
+      ? "Telegramから依頼を受けて、まず使える下書き・確認結果を返します。"
+      : "説明と入力例を確認できます。実行基盤はまだ準備中です。",
+    status.connectorKeys.length
+      ? `<b>接続が必要な場合</b>：${status.connectorKeys.join(", ")}（未接続なら外部操作は行わず、下書きで止まります）`
+      : "<b>外部接続</b>：不要（入力された内容だけで下書きできます）",
     "",
     `<b>送るもの</b>：${room.input}`,
     `<b>返ってくるもの</b>：${room.output}`,
@@ -113,9 +123,12 @@ function allToolsMessage(keys) {
   return [
     "🧰 <b>avocadominiの10種類</b>",
     "",
-    ...FEATURE_KEYS.map((key) => `${selected.has(key) ? "✅" : "▫️"} ${FEATURE_ROOMS[key].emoji} <b>${FEATURE_NAMES[key]}</b> — ${FEATURE_ROOMS[key].summary}`),
+    ...FEATURE_KEYS.map((key) => {
+      const status = featureStatus(FEATURE_BY_KEY[key]);
+      return `${selected.has(key) ? "✅" : "▫️"} ${FEATURE_ROOMS[key].emoji} <b>${FEATURE_NAMES[key]}</b> — ${status.label} — ${FEATURE_ROOMS[key].summary}`;
+    }),
     "",
-    "無料で同時に選べるのは1〜3種類です。名前を押すと詳しい説明を見られます。",
+    "無料で同時に選べるのは1〜3種類です。名前を押すと、入力例・返ってくるもの・接続待ちの有無を確認できます。",
   ].join("\n");
 }
 
