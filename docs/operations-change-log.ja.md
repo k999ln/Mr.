@@ -11,6 +11,25 @@
 - 読み取り確認だけで状態が変わらない操作は、通常は追記しない。ただし、完了条件のreceiptとして必要な場合は確認結果を記録する。
 - 古い別Bot（Rockstar系を含む）のアカウント、値、プロジェクトはavocadominiへ流用しない。
 
+## 2026年9月25日 14:33 JST — Telegram道具画面の強化をRailwayへ反映
+
+### GitHub / Mr
+
+- `k999ln/Mr.` の`main`へ、道具ごとの実行状態、入力、返却物、未接続コネクタをTelegram画面へ表示する変更をpush。
+- 機能別プロンプトにも同じカタログ情報と品質条件を渡し、未接続の外部操作を実行済みと表現しない境界を追加。
+- 機能カタログ、Telegramルーム、workflowのfocused test 33件が合格。
+- 実装commitは`3ecff6581ad80b581a616e119d53ce1d21e3cf8c`。現在の`main`は後続のREADME同期commitを含む。
+
+### Railway / Core
+
+- RailwayのMr serviceで、GitHub経由の最新デプロイが`ACTIVE`かつ`Deployment successful`であることを確認。
+- 公開URL `https://mr-production-5c40.up.railway.app/health` はHTTP 200、`ok: true`、service `life-call` を返した。
+- Railwayの環境変数やTelegram tokenなどの秘密値は変更・表示・記録していない。
+
+### 未完了
+
+- Telegram実機で`/tools`、各道具ルーム、依頼受付から結果通知までを再送信して確認する作業は別途残る。
+
 ## 2026年9月4日 20:58 JST — avocadominiの運用先をKai所有の新環境へ分離
 
 ### Supabase（データベース）
