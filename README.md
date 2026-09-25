@@ -26,10 +26,10 @@ avocadominiは、仕事の整理、教材作成、内容確認、販売準備、
 
 | 項目 | 状態 |
 |---|---|
-| 最終自動同期 | 2026-09-04 23:00 UTC |
+| 最終自動同期 | 2026-09-25 04:00 UTC |
 | 対象ブランチ | `main` |
-| 追跡ファイル | 7,076件 |
-| 実行receipt | [run 33928034327](https://github.com/k999ln/Mr./actions/runs/33928034327) |
+| 追跡ファイル | 7,153件 |
+| 実行receipt | [run 36096681276](https://github.com/k999ln/Mr./actions/runs/36096681276) |
 
 > この範囲は毎時のGitHub Actionsが更新します。製品説明や運用状態は、根拠となる変更と同じcommitで本文を更新します。
 <!-- hourly-repository-sync:end -->
