@@ -1,244 +1,244 @@
 # Mr. Automation Hub / avocadomini
 
-Mr.は、自社開発・外部の自動化ツールをまとめ、Web・アプリ・専用作業環境から利用するハブを目指します。新しい基本利用料の設計は**8.88 USD/月（電気代プラン）・利用者売上の分配0%**です。従量のAI費用・外部有料ツールは別枠とし、実際の月額請求はまだ接続していません。
+Mr. is intended to bring first-party and external automation tools into one hub that can be used from the web, apps, and dedicated work environments. The new base-plan design is **USD 8.88 per month (the electricity plan), with 0% of user revenue shared**. Usage-based AI charges and paid external tools are separate, and live monthly billing has not yet been connected.
 
-今回の基盤には、15件のツール在庫と検索、利用状態の区別、導入候補を仕事一覧へ保存する機能、ココナラの提案文・納品チェックのオフライン作成、共通のローカルrunnerを追加しました。Webの新版は検証・保存済みで、既存の公開サイトへの反映は所有者の確認待ちです。専用OSイメージ、署名済みデスクトップ配布、全ツールの実行、収益の自動発生を完成済みとは扱いません。
+The current foundation adds an inventory and search experience for 15 tools, clear usage-state distinctions, the ability to save candidate tools to a work list, offline generation of Coconala proposal drafts and delivery checks, and a shared local runner. The new web version has been verified and preserved, but publishing it over the existing public site is waiting for owner confirmation. A dedicated OS image, signed desktop distribution, execution of every tool, and automatic revenue generation are not considered complete.
 
-- [新しいサービス設計と実装範囲](docs/mr-automation-hub-foundation.ja.md)
-- [共通ツールカタログと料金契約](packages/automation-hub/README.md)
-- [ローカル実行の使い方](services/automation-runner/README.md)
-- [OS実行環境の基盤](deploy/automation-os/README.md)
+- [New service design and implementation scope](docs/mr-automation-hub-foundation.ja.md)
+- [Shared tool catalog and pricing contract](packages/automation-hub/README.md)
+- [Using the local runner](services/automation-runner/README.md)
+- [OS runtime foundation](deploy/automation-os/README.md)
 
-新版Webは`/`がツールハブ、既存の生活・仕事・収支・Service Cell・接続・配給・データ管理は`/life`です。GitHub未反映だった最新Sitesの追加実装も保全し、同じ認証と保存データを使用します。`/owner`は専用管理権限のある画面ではなく、設計資料と本人データの集計です。`npm run test:automation-hub`とSite内の`npm test`でこの基盤を検証できます。既存Telegramサービスの説明は以下に残します。旧無料枠・Stars・単品販売・Stripe商品は、新しい月額プランへの移行完了まで別の既存仕様として扱います。
+In the new web version, `/` is the tool hub. Existing life, work, finance, Service Cell, connection, distribution, and data-management features live under `/life`. Recent Sites additions that had not yet reached GitHub have also been preserved and use the same authentication and stored data. `/owner` is not a privileged administration screen; it aggregates design material and the signed-in owner's own data. Run `npm run test:automation-hub` and the Site's `npm test` to verify this foundation. The existing Telegram service is described below. The previous free tier, Stars, one-off sales, and Stripe products remain separate legacy behavior until migration to the new monthly plan is complete.
 
-avocadominiは、仕事の整理、教材作成、内容確認、販売準備、集客、顧客案内、入金確認、納品、分析、報酬分配を、Telegramから動かす仕事の司令室です。
+avocadomini is a Telegram-operated work control room for organizing requests, creating learning materials, reviewing content, preparing products for sale, marketing, guiding customers, confirming payment, delivering work, analyzing results, and distributing rewards.
 
-## Telegramの入口
+## Telegram entry points
 
-まず[Mr.メインチャンネル／入口](https://t.me/RockstarMrBot)から入れます。そこから用途に応じて、[avocadomini](https://t.me/avocadominibot)（公開向けの道具ハブ）または[ibot](https://t.me/Rockstar_ibot)（運営・開発用）へ進みます。Botを開いたら`/start`、メニュー確認は`/help`を送ってください。
+Start with the [Mr. main channel and entry point](https://t.me/RockstarMrBot). From there, open [avocadomini](https://t.me/avocadominibot), the public tool hub, or [ibot](https://t.me/Rockstar_ibot), the operations and development bot. Send `/start` after opening a bot and `/help` to view its menu.
 
-システム全体の正式名は`Rockstar_ibot`です。`Mr. Commerce`と`Doraemon`は互換性のため残る内部package名で、利用者向けの製品名は「avocadomini」です。
+The official name of the full system is `Rockstar_ibot`. `Mr. Commerce` and `Doraemon` remain as internal package names for compatibility; the user-facing product name is **avocadomini**.
 
-> 現在の本番範囲は、10種類から1〜3種類を選び、Telegramへ自然文で依頼し、隔離されたCodexから下書き・確認結果を受け取り、修正・完了・再開するところまでです。外部providerの認証情報や公式readbackがない操作は成功扱いにしません。
+> The current production scope lets a user choose one to three of ten tool categories, send a natural-language request through Telegram, receive a draft or review result from an isolated Codex session, and revise, complete, or resume the job. An operation is not treated as successful without external-provider credentials and authoritative readback.
 
 <!-- hourly-repository-sync:start -->
-## 毎時リポジトリ同期
+## Hourly repository sync
 
-| 項目 | 状態 |
+| Item | Status |
 |---|---|
-| 最終自動同期 | 2026-09-25 04:00 UTC |
-| 対象ブランチ | `main` |
-| 追跡ファイル | 7,153件 |
-| 実行receipt | [run 36096681276](https://github.com/k999ln/Mr./actions/runs/36096681276) |
+| Last automatic sync | 2026-09-25 04:00 UTC |
+| Target branch | `main` |
+| Tracked files | 7,153 |
+| Run receipt | [run 36096681276](https://github.com/k999ln/Mr./actions/runs/36096681276) |
 
-> この範囲は毎時のGitHub Actionsが更新します。製品説明や運用状態は、根拠となる変更と同じcommitで本文を更新します。
+> GitHub Actions updates this block every hour. Product descriptions and operating status are updated in the body alongside the change that provides the supporting evidence.
 <!-- hourly-repository-sync:end -->
 
-[正式サイト](https://effect-os-verified.kirin-999.chatgpt.site/start) · [画面ジャック対策](docs/automation-browser-screen-takeover-prevention.ja.md) · [自動化管理画面](https://mr-automation-control-20260904.kirin-999.chatgpt.site) · [新チャット用引き継ぎ](docs/CHAT-HANDOFF.ja.md) · [接続台帳](docs/owner-account-registry.ja.md) · [外部変更履歴](docs/operations-change-log.ja.md) · [利用者journeyとrelease gate](docs/avocadomini-release-gates.ja.md) · [プロジェクト索引](docs/PROJECT_MEMORY_INDEX.ja.md) · [Rockstar_ibot One Hub](https://life-manager-one-hub.kirin-999.chatgpt.site) · [GitHub](https://github.com/k999ln/Mr.) · [Telegram Bot設定](docs/telegram-bot-setup.ja.md) · [製品設計](project.md) · [MIT License](LICENSE)
+[Official site](https://effect-os-verified.kirin-999.chatgpt.site/start) · [Screen-takeover prevention](docs/automation-browser-screen-takeover-prevention.ja.md) · [Automation control room](https://mr-automation-control-20260904.kirin-999.chatgpt.site) · [New-chat handoff](docs/CHAT-HANDOFF.ja.md) · [Connection registry](docs/owner-account-registry.ja.md) · [External change log](docs/operations-change-log.ja.md) · [User journey and release gates](docs/avocadomini-release-gates.ja.md) · [Project index](docs/PROJECT_MEMORY_INDEX.ja.md) · [Rockstar_ibot One Hub](https://life-manager-one-hub.kirin-999.chatgpt.site) · [GitHub](https://github.com/k999ln/Mr.) · [Telegram setup](docs/telegram-bot-setup.ja.md) · [Product design](project.md) · [MIT License](LICENSE)
 
-## TelegramからCodexへ指示を送り、結果を受け取る
+## Send instructions from Telegram to Codex and receive results
 
-一般利用者は`@avocadominibot`の道具別ルームか総合司令室へ普通の文章を送ると、Mac上のCodexが読み取り専用の空の一時folderで下書き・確認結果を作り、同じTelegramへ返します。Kai専用の運営・承認・監視は`@Rockstar_ibot`へ分離する設計で、現時点ではowner Botのlive接続receiptが未完了です。`/codex`はMr.の調査用、`/codex edit`は明示したrepository変更用です。接続と安全境界は[Telegram ↔ Codex 引き継ぎ](docs/codex-telegram-bridge.ja.md)にまとめています。
+General users send ordinary text to a tool room or the main control room in `@avocadominibot`. Codex on the Mac creates drafts and review results inside an empty, read-only temporary folder and returns them to the same Telegram conversation. Kai-only operations, approvals, and monitoring are designed to remain separate in `@Rockstar_ibot`; the live owner-bot connection receipt is not yet complete. `/codex` is for investigating Mr., while `/codex edit` is for explicitly requested repository changes. The connection and safety boundaries are documented in the [Telegram ↔ Codex handoff](docs/codex-telegram-bridge.ja.md).
 
-利用者向けの共通入口は`/start`、`/home`、`/tools`、`/jobs`、`/today`、`/help`です。Core起動時にBotFatherの一覧と説明を自動照合し、差分だけ修復します。データベースが一時停止しても`/help`の説明は返します。
+Common user commands are `/start`, `/home`, `/tools`, `/jobs`, `/today`, and `/help`. When Core starts, it automatically compares the BotFather command list and description and repairs only differences. `/help` continues to return explanatory text even when the database is temporarily paused.
 
-Mac上の定期ブラウザはheadless固定で、通常は画面や入力フォーカスを奪いません。例外的に可視操作が必要なときだけ、`bin/lm-screen approve <loop-id> --seconds 60..900`の後に`bin/lm-screen run <loop-id> -- <command>`で単発実行します。`bin/lm-screen revoke`で実行中のhandoffを停止でき、承認は再利用されません。
+Scheduled browsers on the Mac are fixed to headless mode and normally do not take over the screen or input focus. When a one-off visible action is unavoidable, run `bin/lm-screen approve <loop-id> --seconds 60..900`, followed by `bin/lm-screen run <loop-id> -- <command>`. `bin/lm-screen revoke` stops an active handoff, and approvals are never reused.
 
-## 初めて読む人向け：本番に必要なもの
+## Production requirements for first-time readers
 
-Mr.は、1つのサイトだけで完結するアプリではありません。利用者が見るサイト、Telegramで返事をする裏側のサーバー、情報を保存するデータベースが連携します。
+Mr. is not an application that runs entirely on one website. The user-facing site, the backend server that answers through Telegram, and the database that stores information work together.
 
-### 「データベース（DB）」とは
+### What is a database?
 
-データベースは、サイトやBotが使うオンラインの台帳です。Excelの表に近いものですが、アプリが自動で読み書きします。Mr.では、TelegramのユーザーID、選んだ機能、利用条件への同意、利用履歴、決済や実行の結果などを保存します。利用者が普段直接見るサイトではありません。
+A database is an online ledger used by the site and bots. It resembles an Excel table, but the application reads and writes it automatically. Mr. stores Telegram user IDs, selected features, acceptance of terms, usage history, and payment and execution results. It is not a site users ordinarily view directly.
 
-### 外部サービスの役割と確認状況
+### External services and verification status
 
-次の表は、2026-09-05 01:10 JSTまでにこの導入環境から確認した状態です。「未確認」はサービスが存在しないという意味ではなく、この作業環境から所有者用の管理画面や設定を確認できていないという意味です。
+The following table records what this installation environment had verified as of 2026-09-05 01:10 JST. “Unverified” does not mean that the service does not exist; it means that the owner's administration screen or configuration could not be confirmed from this environment.
 
-| サービス | 役割 | 確認状況 |
+| Service | Role | Verification status |
 |---|---|---|
-| GitHub `k999ln/Mr.` | Mr.の正本コード。対象ブランチは`main` | 接続済み。`vvvv`は使用しない |
-| Codex Sites / サイト公開 | `avocadomini`の利用者向け正式サイト | owner確認済み。version 44、deployment成功、`/start` HTTP 200 |
-| Vercel | 古い`doraos.vercel.app`利用者を正式サイトへ案内 | accountとprojectを確認済み。全path/queryをCodex SitesへHTTP 307で転送。GitHubからの自動deployだけ未設定 |
-| Railway | customer Botの`/start`、Job受付、返信を処理する裏側のサーバー | `avocadomini-production` / `avocadomini-core`稼働中。deployment成功、health HTTP 200、build SHA確認済み。owner Bot用serviceは未配備 |
-| Supabase | Coreが使うデータベース。選択、Job、状態、receiptを保存 | `Kai Mr` / `avocadomini-production`へ必要migration適用済み。RLSとservice-role-only権限をreadback済み |
-| Telegram customer Bot / BotFather | 顧客受付、Webhook、利用者への返信 | `@avocadominibot`、`getMe`成功、Webhook登録済み。token rotationと実Job E2Eが未完了 |
-| Telegram owner Bot / BotFather | Kai専用の承認、監視、停止、Life OS | `@Rockstar_ibot`を正とする。独立deployment、`getMe`、Webhook、allowlist、実送受信receiptは未完了 |
-| Resend | メールや診断PDFの送信 | Telegram開始導線には不要。メール機能を使うときだけ送信キーと送信元ドメインが必要 |
-| Stripe | 有料機能の決済 | 設定済みの可能性はあるが、現在の管理画面からの公式確認は未完了。無料の3機能選択には不要 |
+| GitHub `k999ln/Mr.` | Source of record for Mr.; target branch is `main` | Connected. Do not use `vvvv`. |
+| Codex Sites / publishing | Official user-facing site for avocadomini | Owner-verified; version 44 deployed successfully; `/start` returned HTTP 200. |
+| Vercel | Redirect users of the old `doraos.vercel.app` site to the official site | Account and project verified; every path and query redirects to Codex Sites with HTTP 307. Automatic deployment from GitHub remains unconfigured. |
+| Railway | Backend for customer-bot `/start`, job intake, and replies | `avocadomini-production` / `avocadomini-core` running; successful deployment, HTTP 200 health response, and build SHA verified. The owner-bot service is not deployed. |
+| Supabase | Core database for selections, jobs, state, and receipts | Required migrations applied to `Kai Mr` / `avocadomini-production`; RLS and service-role-only permissions read back. |
+| Telegram customer bot / BotFather | Customer intake, webhook, and replies | `@avocadominibot` passed `getMe`; webhook registered. Token rotation and a real job end-to-end test remain incomplete. |
+| Telegram owner bot / BotFather | Kai-only approval, monitoring, stopping, and Life OS | `@Rockstar_ibot` is authoritative. Independent deployment, `getMe`, webhook, allowlist, and live send/receive receipt remain incomplete. |
+| Resend | Email and diagnostic-PDF delivery | Not required for the initial Telegram path. A sending key and sender domain are needed only when email features are enabled. |
+| Stripe | Payments for paid features | It may be configured, but authoritative verification through the current dashboard is incomplete. It is not required for choosing three free features. |
 
-### 最初のTelegram導線だけに必要な情報
+### Information required for the initial Telegram path
 
-「サイトで1〜3個選ぶ → Telegramを開く → `/start`で選択内容を反映する」だけなら、次の3つが必要です。
+Only three things are needed for “choose one to three items on the site → open Telegram → reflect the selection with `/start`”:
 
-1. 裏側のサーバーを置く場所（Railwayなど）と、その管理権限
-2. データベース（Supabase）のプロジェクトと、migrationを適用できる権限
-3. BotFatherで作ったTelegram Botをサーバーから動かす権限
+1. A place to run the backend server, such as Railway, and permission to administer it.
+2. A Supabase database project and permission to apply migrations.
+3. Permission to run a BotFather-created Telegram bot from the server.
 
-Bot token、Webhook secret、Supabaseのservice role keyなどの秘密値は、GitHub、README、issue、チャットへ貼りません。RailwayやSupabaseの環境変数、Keychain、秘密情報保管場所へ保存します。
+Never paste secrets such as bot tokens, webhook secrets, or Supabase service-role keys into GitHub, a README, an issue, or chat. Store them in Railway or Supabase environment variables, Keychain, or an approved secret store.
 
-### 全機能を使う場合の追加サービス
+### Additional services for all features
 
-10個の販売機能をすべて有効にする場合は、上記に加えて、メール送信のResend、決済のStripe、Google Calendar・MapsやAI provider、音声通話のTelnyx、必要に応じたブラウザ実行基盤などを、それぞれKai所有のアカウントで接続します。これらは、最初の無料Telegram導線を確認するための必須条件ではありません。
+Enabling all ten sales functions also requires owner-controlled connections for Resend email, Stripe payments, Google Calendar and Maps, AI providers, Telnyx voice calls, and browser execution where needed. These are not prerequisites for validating the initial free Telegram path.
 
-各サービスのアカウント、project、秘密値の保管先、確認日時、receipt、未確認事項は[avocadomini外部サービス接続台帳](docs/owner-account-registry.ja.md)と[新チャット用引き継ぎ](docs/CHAT-HANDOFF.ja.md)に集約しています。新しいチャットではこれらを先に読み、確定済みの接続を聞き直しません。
+The [external-service connection registry](docs/owner-account-registry.ja.md) and [new-chat handoff](docs/CHAT-HANDOFF.ja.md) contain each service account, project, secret-storage location, verification time, receipt, and open item. New chats should read those records first instead of asking again about confirmed connections.
 
-### 正本repoとclone方法
+### Source repository and cloning
 
-GitHubの正式な正本は末尾にピリオドがある`k999ln/Mr.`です。clone URLが`Mr..git`になるのは正常です。修正、commit、push、deployはこのrepoの`main`だけを対象にします。旧repo`vvvv`を修正先・push先・deploy先として使いません。
+The official GitHub source repository is `k999ln/Mr.`, including the trailing period. A clone URL ending in `Mr..git` is therefore correct. Changes, commits, pushes, and deployments target only this repository's `main` branch. Do not use the legacy `vvvv` repository as a change, push, or deployment target.
 
-## X・LP・メール販売導線
+## X, landing-page, and email sales funnel
 
-公開サイトの正本は`apps/doraemon-marketing-site`です。無料診断PDF、同意付きフォーム、UTM、Resendの即時送付と4通ステップメール、配信停止まで実装しています。
+The source of record for the public site is `apps/doraemon-marketing-site`. It implements a free diagnostic PDF, a consent-aware form, UTM tracking, immediate delivery through Resend, a four-message email sequence, and unsubscribe handling.
 
-- X投稿: `marketing/x/posts.json`（30日×3件）
-- 人が読むカレンダー: `marketing/x/30-day-calendar.ja.md`
-- 無料資料: `apps/doraemon-marketing-site/public/resources/sales-automation-checklist-v1.pdf`
-- メール設計: `marketing/email/sequence.ja.md`
-- 本人作業と公開前検査: `docs/doraemon-marketing-launch.ja.md`
+- X posts: `marketing/x/posts.json` (three per day for 30 days)
+- Human-readable calendar: `marketing/x/30-day-calendar.ja.md`
+- Free resource: `apps/doraemon-marketing-site/public/resources/sales-automation-checklist-v1.pdf`
+- Email design: `marketing/email/sequence.ja.md`
+- Owner tasks and pre-publication checks: `docs/doraemon-marketing-launch.ja.md`
 
-実投稿、一般公開、決済、メール配信はKai所有のX、Sites、Stripe、Telegram、Resend、Turnstileを接続し、各receiptを確認してから有効化します。
+Live posting, general publication, payment, and email delivery are enabled only after connecting Kai-owned X, Sites, Stripe, Telegram, Resend, and Turnstile accounts and verifying each receipt.
 
-## 10個の道具
+## Ten tools
 
-1. 依頼を整理
-2. 教材を作る
-3. 内容を検証
-4. 売り場を作る
-5. 集客を広げる
-6. 見込み客を育てる
-7. 入金を確認
-8. 商品を届ける
-9. 成果を測る
-10. 報酬を分ける
+1. Organize a request.
+2. Create learning material.
+3. Review content.
+4. Build a storefront.
+5. Expand marketing reach.
+6. Nurture prospects.
+7. Confirm payment.
+8. Deliver the product.
+9. Measure results.
+10. Distribute rewards.
 
-単なる一斉送信BOTではありません。人の承認、重複実行防止、providerの公式結果、施策と長期成果の記録を一つのworkflowにします。
+This is not a broadcast-only bot. Human approval, duplicate-execution prevention, authoritative provider results, and records connecting initiatives to long-term outcomes are part of one workflow.
 
-## 何ができるか
+## Capabilities
 
-| 領域 | 主な機能 | 現在の状態 |
+| Area | Main capability | Current state |
 |---|---|---|
-| Telegram顧客Bot | 受付、道具選択、依頼、進捗、納品 | `@avocadominibot`を接続済み。token rotationと実Job E2Eが残る |
-| Telegram owner Bot | 承認、停止、状態確認、Life OS | `@Rockstar_ibot`をKai専用で別deploymentへ接続する設計。live receiptは未完了 |
-| Rockstar_ibot Core | 予定、移動、通知、生活・仕事・収支workflow | 一部は実運用、一部はprovider接続待ち |
-| MetaMask送金先 | Core PanelからBase MainnetのUSDC受取addressを所有署名で登録 | 実装済み。DB migration適用後に有効。送金権限は要求しない |
-| Rockstar_ibot One Hub | Today、Body/Mind、Money、Work、Connections、Proof | 所有者限定で稼働 |
-| Service Cells | 作成、集客、販売、学習、納品の定型service | executorは段階実装中 |
-| Rockstar_ibot | 商品、決済観測、権限、同意、施策、成果の統合 | 正本data modelと安全な保存境界を実装済み |
-| 外部AI catalog | MCP等のmanifest、権限、digest検証 | metadataのみ。install・実行・課金は無効 |
-| iOS | native SwiftUIクライアント | PreviewとSimulator検証まで完了 |
-| ローカルruntime | API、scheduler、worker、Postgres、object store | Docker構成あり。fresh Core schemaは未完成 |
+| Telegram customer bot | Intake, tool selection, requests, progress, and delivery | `@avocadominibot` connected; token rotation and a real job end-to-end test remain. |
+| Telegram owner bot | Approval, stopping, state review, and Life OS | Designed as a separate Kai-only `@Rockstar_ibot` deployment; live receipt incomplete. |
+| Rockstar_ibot Core | Schedule, movement, notifications, and life/work/finance workflows | Some parts are live; others are waiting for provider connections. |
+| MetaMask destination | Register a Base Mainnet USDC receiving address in Core Panel with an ownership signature | Implemented and available after the DB migration. It does not request transfer authority. |
+| Rockstar_ibot One Hub | Today, Body/Mind, Money, Work, Connections, and Proof | Running for the owner only. |
+| Service Cells | Standardized creation, marketing, sales, learning, and delivery services | Executors are being implemented in stages. |
+| Rockstar_ibot commerce | Unified product, payment-observation, permission, consent, initiative, and outcome data | Authoritative data model and safe storage boundaries implemented. |
+| External AI catalog | MCP and other manifests, permissions, and digest verification | Metadata only; installation, execution, and billing are disabled. |
+| iOS | Native SwiftUI client | Preview and Simulator verification complete. |
+| Local runtime | API, scheduler, worker, Postgres, and object storage | Docker setup exists; a fresh Core baseline schema is incomplete. |
 
-## 2つのTelegram Botと担当
+## Two Telegram bots and their responsibilities
 
-Telegramは、Kai専用の`@Rockstar_ibot`と顧客向け`@avocadominibot`の2 Botを正とします。customer Botは接続確認済み、owner Botは独立deploymentと公式readbackが未完了です。Mr. Bot、BotMother、Baby、Life Guardは追加Botではなく、`@avocadominibot`内の会話窓口です。
+The authoritative topology uses two bots: Kai-only `@Rockstar_ibot` and customer-facing `@avocadominibot`. The customer bot is connected; the owner bot still needs an independent deployment and authoritative readback. Mr. Bot, BotMother, Baby, and Life Guard are conversation roles within `@avocadominibot`, not additional bots.
 
 ~~~text
-@Rockstar_ibot（Kai専用owner Bot）
-└── 運営・承認・監視・停止・Life OS
+@Rockstar_ibot (Kai-only owner bot)
+└── Operations, approvals, monitoring, stopping, and Life OS
 
-@avocadominibot（顧客向け公開Bot）
-├── 会話担当
-│   ├── Mr. Bot       全体司令塔
-│   ├── BotMother     生活必需品・必要サービス支援
-│   ├── Baby          外部の仕事・案件による収益化
-│   └── Life Guard    安全・権限・証拠確認
-├── 業務ワークスペース
-│   └── Rockstar_ibot 自分の商品・決済・顧客・納品
-└── 話し方
-    └── 16スタイル    担当や権限を変えない会話表現
+@avocadominibot (public customer bot)
+├── Conversation roles
+│   ├── Mr. Bot       General coordinator
+│   ├── BotMother     Essential-goods and required-service support
+│   ├── Baby          External work and opportunity-based earnings
+│   └── Life Guard    Safety, permissions, and evidence checks
+├── Business workspace
+│   └── Rockstar_ibot The user's products, payments, customers, and delivery
+└── Conversation style
+    └── 16 styles      Different expression without changing role or authority
 ~~~
 
-| 名前 | 開き方 | 担当する用途 | 担当しない用途 |
+| Name | Open with | Responsible for | Not responsible for |
 |---|---|---|---|
-| Mr. Bot | `/main` | 未分類の相談、予定・生活・仕事・お金の全体整理、担当の振り分け | 販売の詳細操作や専門審査 |
-| Rockstar_ibot | `/commerce` | 自分の商品、販売施策、注文、決済、購入者、同意、納品、販売分析 | 外部案件探し、生活支援、安全審査そのもの |
-| BotMother | `/mother` | 必需品・必要サービス支援の申請整理 | 現金給付、販売CRM、無承認発注 |
-| Baby | `/baby` | 自分のスキルに合う外部案件、提案、作業、報酬確認 | 自分の商品販売と購入者管理 |
-| Life Guard | `/guard` | 安全、権限、privacy、証拠、完了条件の横断検査 | 販売・仕事・支援の実行主体 |
-| 会話スタイル | `/style` | 同じ担当の伝え方・考え方を変更 | 機能追加、権限追加、心理診断 |
+| Mr. Bot | `/main` | Unclassified requests; coordinating schedule, life, work, and money; routing work | Detailed sales operations or specialist review |
+| Rockstar_ibot | `/commerce` | The user's products, sales initiatives, orders, payments, customers, consent, delivery, and sales analysis | Finding external jobs, life support, or safety review itself |
+| BotMother | `/mother` | Organizing applications for essential goods and required services | Cash benefits, sales CRM, or unapproved orders |
+| Baby | `/baby` | External opportunities suited to the user's skills, proposals, work, and reward confirmation | Selling the user's own products or managing buyers |
+| Life Guard | `/guard` | Cross-cutting safety, permission, privacy, evidence, and completion-condition review | Acting as the executor for sales, work, or support |
+| Conversation style | `/style` | Changing how the same role communicates and reasons | Adding features, adding authority, or psychological diagnosis |
 
-### 重複して見える入口の違い
+### Similar-looking entry points
 
-| 入口 | 違い |
+| Entry point | Difference |
 |---|---|
-| `/status` / `/today` / `/analytics` | `/status`はLife Manager全体、`/today`は販売部門の要対応、`/analytics`はreceipt確認済みの販売結果 |
-| `/baby` / `/commerce` | Babyは外部の仕事で稼ぐ相談、Rockstar_ibotは自分の商品を売る業務 |
-| 商品作成後の発売ボタン / `launch_offer` | 同じ統合発売フロー。ボタンは入力を省く近道 |
-| `/delivery` / `deliver_order` | `/delivery`は単独の納品案、`deliver_order`は支払確認・納品・通知をつなぐ統合フロー |
-| 承認ボタン / `/approve` | 同じ承認処理。コマンドはボタンが使えない場合の代替入口 |
-| `/tools`で選択 / provider接続 | 選択は利用枠の指定だけ。資格情報・adapter・provider確認が揃って初めて接続済みになる |
+| `/status` / `/today` / `/analytics` | `/status` covers all of Life Manager, `/today` shows sales items requiring action, and `/analytics` shows receipt-verified sales results. |
+| `/baby` / `/commerce` | Baby helps with earning from external work; Rockstar_ibot runs the user's own product sales. |
+| Launch button after product creation / `launch_offer` | The same integrated launch flow; the button is a shortcut that reduces input. |
+| `/delivery` / `deliver_order` | `/delivery` proposes a standalone delivery; `deliver_order` connects payment confirmation, delivery, and notification. |
+| Approval button / `/approve` | The same approval process; the command is a fallback when a button cannot be used. |
+| Selection in `/tools` / provider connection | Selection only reserves usage scope. Credentials, an adapter, and provider verification are still required for a connected state. |
 
 ## Rockstar_ibot
 
-Rockstar_ibotはシステム全体の名前であり、Telegramを操作面にした販売・意思決定基盤です。同名の`@Rockstar_ibot`はKai専用owner control plane、`@avocadominibot`は顧客向けcustomer and revenue planeです。販売の業務ワークスペースはcustomer Botから`/commerce`で開きます。
+Rockstar_ibot is the name of the overall sales and decision platform with Telegram as its operating surface. `@Rockstar_ibot` is the Kai-only owner control plane; `@avocadominibot` is the customer and revenue plane. The commerce workspace opens from the customer bot with `/commerce`.
 
 ~~~text
-商品・Offer・約束を版として固定
+Freeze the Product, Offer, and Promise as versions
         ↓
-施策候補を作成し、承認者が選択
+Create initiative candidates and let an approver choose
         ↓
-投稿・通知・決済・権限付与を実行
+Execute posting, notification, payment, or entitlement changes
         ↓
-providerの公式結果を観測
+Observe the provider's authoritative result
         ↓
-購入・返金・継続・解約・不一致を記録
+Record purchases, refunds, renewals, cancellations, and mismatches
         ↓
-施策と長期Outcomeを検証
+Evaluate the initiative and long-term outcome
 ~~~
 
-### 実装済みの正本data
+### Implemented authoritative data
 
-- 変更不能なOffer VersionとPromise Version
-- Order、Payment、Refund、Chargebackの観測
-- 購入者Entitlementのdesired stateとobserved state
-- Consent、Purpose、Notice Version、Withdrawal
-- Decision Opportunity、全候補、却下、選択確率、承認
-- Experiment、holdout、Outcome、純経済価値への参照
-- Webhook inbox、lease、retry、reconciliation evidence
-- 承認主体と承認policyの仮名化参照
+- Immutable Offer Versions and Promise Versions
+- Order, Payment, Refund, and Chargeback observations
+- Desired and observed states for buyer Entitlements
+- Consent, Purpose, Notice Version, and Withdrawal
+- Decision Opportunities, all candidates, rejections, selection probability, and approval
+- Experiments, holdouts, Outcomes, and references to net economic value
+- Webhook inbox, leases, retries, and reconciliation evidence
+- Pseudonymous references to approvers and approval policies
 
-個人を販売者横断で追跡するIDは作りません。raw email、電話番号、token、password、会話本文を意思決定台帳へ保存せず、販売者単位の仮名参照と許可済み集計結果を使います。
+The system does not create a cross-merchant identifier for tracking a person. It does not store raw email addresses, phone numbers, tokens, passwords, or conversation bodies in the decision ledger. It uses merchant-scoped pseudonymous references and approved aggregate results.
 
-### 保証する整合性
+### Consistency guarantees
 
-- 同じprovider Webhookを100回受けても1つの観測へ収束する
-- 期限切れleaseを持つ古いworkerは結果を確定できない
-- Refund／Chargebackは対応する元Paymentだけを取り消せる
-- 累計取消額は元Paymentを超えない
-- Orderは正確なOffer／Promise Versionへ固定される
-- 存在しない旧Versionをsupersedes先にできない
-- 実provider readbackなしに売上や完了を表示しない
-- canonical evidence storeではtenant、merchant、idempotency、authorizationの境界を分離する
+- Receiving the same provider webhook 100 times converges on one observation.
+- A stale worker holding an expired lease cannot finalize a result.
+- A Refund or Chargeback can reverse only its corresponding original Payment.
+- Total reversals cannot exceed the original Payment.
+- An Order is pinned to exact Offer and Promise Versions.
+- A nonexistent historical Version cannot be used as a `supersedes` target.
+- Revenue and completion are not shown without real provider readback.
+- The canonical evidence store separates tenant, merchant, idempotency, and authorization boundaries.
 
-詳細は[Rockstar_ibot統合方針](docs/revenue-assurance-integration.ja.md)を参照してください。
+See the [Rockstar_ibot integration policy](docs/revenue-assurance-integration.ja.md).
 
-## 5分で確認する
+## Verify in five minutes
 
-### 必要環境
+### Requirements
 
 - Git
-- Node.js 20.19.0以上
+- Node.js 20.19.0 or later
 - npm
-- Docker（ローカルstackを起動する場合）
+- Docker, if running the local stack
 
-### 1. clone
+### 1. Clone
 
-このリポジトリはsubmoduleを含みます。
+This repository contains submodules.
 
 ~~~bash
 git clone --recurse-submodules https://github.com/k999ln/Mr..git
 cd Mr.
 ~~~
 
-すでにclone済みの場合:
+For an existing clone:
 
 ~~~bash
 git submodule update --init --recursive
 ~~~
 
-### 2. Commerceテスト
+### 2. Commerce tests
 
 ~~~bash
 cd apps/rockstar_ibot
@@ -246,11 +246,11 @@ npm ci
 npm run test:commerce
 ~~~
 
-現在のCommerce suiteは、Telegram承認、tenant分離、決済観測、Webhook再送、権限、同意、意思決定を含む125件です。server依存がない環境ではHTTP統合確認1件だけをskipします。
+The current Commerce suite contains 125 tests covering Telegram approval, tenant isolation, payment observations, webhook redelivery, entitlements, consent, and decisions. In environments without server dependencies, one HTTP integration check is skipped.
 
-### 3. ローカルstack
+### 3. Local stack
 
-リポジトリrootで実行します。
+Run these commands from the repository root:
 
 ~~~bash
 ./scripts/local-up.sh
@@ -258,36 +258,36 @@ npm run test:commerce
 ./scripts/local-up.sh logs
 ~~~
 
-停止:
+Stop it with:
 
 ~~~bash
 ./scripts/local-up.sh down
 ~~~
 
-ローカルstackはPostgres、object store、API、scheduler、workerを起動します。ただし、Telegram、Supabase、Calendar等は導入者所有の外部設定を使うため、起動だけで全機能が接続済みになるわけではありません。
+The local stack starts Postgres, object storage, the API, scheduler, and worker. Telegram, Supabase, Calendar, and similar services use installer-owned external configuration, so starting the stack does not make every feature connected.
 
-## 初期設定
+## Initial setup
 
-### 秘密情報の扱い
+### Secrets
 
-秘密値をGit、README、issue、チャットへ貼らないでください。最初の`./scripts/local-up.sh`実行時に、local stack用の`deploy/local/.env`がmode 0600で作成され、MinIO passwordもランダム生成されます。`.env.example`をそのまま`.env`へcopyしないでください。
+Never paste secrets into Git, a README, an issue, or chat. The first `./scripts/local-up.sh` run creates `deploy/local/.env` for the local stack with mode 0600 and generates a random MinIO password. Do not copy `.env.example` directly to `.env`.
 
-その他の秘密値はmode 0600のprivate env、Keychain、またはtenant vaultへ保存します。job、event、manifestにはcredential本体ではなく参照だけを渡します。
+Store other secrets in a mode-0600 private environment file, Keychain, or a tenant vault. Jobs, events, and manifests receive references, not credential values.
 
-### 導入者所有providerを検査する
+### Check installer-owned providers
 
 ~~~bash
 npm run owner:check -- --profile base,calendar,voice,billing
 ~~~
 
-このコマンドは値を表示せず、必要な変数名と形式を検査します。provider所有権、残高、OAuth同意、migration適用、Webhook到達性までは証明しません。
+This command checks required variable names and formats without printing values. It does not prove provider ownership, balance, OAuth consent, migration application, or webhook reachability.
 
-- [設置者アカウント入力票](docs/owner-account-intake.ja.md)
-- [provider設定一覧](docs/owner-tools-setup.ja.md)
+- [Installer account intake](docs/owner-account-intake.ja.md)
+- [Provider setup guide](docs/owner-tools-setup.ja.md)
 
-### Telegram Botを接続する
+### Connect a Telegram bot
 
-runtimeの標準は、導入環境ごとにBotFather Botを1つ所有する`byob_single`です。Kaiの2 Botは2つの独立deploymentへ1 Botずつ接続し、同じprocessへ2 tokenを入れません。
+The runtime standard is `byob_single`: one BotFather bot owned by each deployment. Kai's two bots connect to two independent deployments, one bot per deployment; never place both tokens in one process.
 
 ~~~bash
 npm run telegram:configure -- \
@@ -295,31 +295,31 @@ npm run telegram:configure -- \
   --register
 ~~~
 
-tokenは非表示promptで入力します。WebhookにはTelegramから到達できるHTTPS URLが必要です。別Botの既存Webhookは、明示許可なしに上書きしません。
+Enter the token through the hidden prompt. The webhook needs a Telegram-reachable HTTPS URL. Do not overwrite another bot's existing webhook without explicit permission.
 
-## Stripeで購入してTelegramへ接続する
+## Purchase with Stripe and connect Telegram
 
-購入画面は`GET /doraemon`です。購入者はStripeのホスト型決済へ移動し、支払い後に`GET /doraemon/complete?session_id={CHECKOUT_SESSION_ID}`へ戻ります。成功画面を見ただけでは権限を付与しません。
+The purchase page is `GET /doraemon`. The buyer moves to Stripe-hosted checkout and returns to `GET /doraemon/complete?session_id={CHECKOUT_SESSION_ID}` after payment. Viewing the success page alone does not grant access.
 
 ~~~text
-/doraemonで購入開始
-  → 公開用client_reference_idを発行
-  → Stripe Payment Linkで決済
-  → 署名済みcheckout.session.completed / async_payment_succeededを受信
-  → 同じブラウザだけに一回限りTelegramリンクを表示
-  → /start doraemon_<token>を原子的に消費
-  → 購入権限とTelegram accountを接続
+Begin purchase at /doraemon
+  → issue a public client_reference_id
+  → pay through a Stripe Payment Link
+  → receive signed checkout.session.completed / async_payment_succeeded
+  → show a one-time Telegram link to the same browser only
+  → atomically consume /start doraemon_<token>
+  → connect the purchase entitlement to the Telegram account
 ~~~
 
-接続tokenの生値はDBへ保存せず、SHA-256 hashだけを保存します。支払前、期限切れ、別Telegramで使用済み、Webhook未確認の場合は接続を拒否します。
+The raw connection token is not stored in the database; only its SHA-256 hash is stored. Connection is rejected before payment, after expiration, after use by another Telegram account, or before webhook verification.
 
-### Stripe側の設定
+### Stripe configuration
 
-1. 自分名義のStripe accountで商品とPayment Linkを作る。
-2. Payment Linkの支払後動作を`redirect`にし、URLを`https://<LM_PUBLIC_URL>/doraemon/complete?session_id={CHECKOUT_SESSION_ID}`にする。
-3. Webhook endpointを`POST https://<LM_PUBLIC_URL>/api/stripe/webhook`に設定し、`checkout.session.completed`、`checkout.session.async_payment_succeeded`とsubscription lifecycle eventを購読する。
-4. `apps/rockstar_ibot/migrations/2026-09-01-lm-doraemon-purchase-claims.sql`をSupabaseへ適用する。
-5. private envへ次を保存する。秘密値をGitへ追加しない。
+1. Create the product and Payment Link in a Stripe account owned by the installer.
+2. Set the Payment Link's post-payment behavior to `redirect` and use `https://<LM_PUBLIC_URL>/doraemon/complete?session_id={CHECKOUT_SESSION_ID}`.
+3. Configure `POST https://<LM_PUBLIC_URL>/api/stripe/webhook` as a webhook endpoint and subscribe to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, and subscription lifecycle events.
+4. Apply `apps/rockstar_ibot/migrations/2026-09-01-lm-doraemon-purchase-claims.sql` to Supabase.
+5. Store the following values in private environment variables. Never commit secrets to Git.
 
 ~~~dotenv
 LM_DORAEMON_PAYMENT_LINK=https://buy.stripe.com/...
@@ -329,28 +329,28 @@ LM_TELEGRAM_BOT_USERNAME=
 LM_TELEGRAM_WEBHOOK_SECRET=
 ~~~
 
-日本のStripe標準料金は初期費用・月額料金なしですが、カード決済成功ごとに3.6%の決済手数料が発生します。Payment Links自体は標準Payments料金に追加料金なしで含まれます。料金は変更され得るため、本番開始前に[Stripe日本料金](https://stripe.com/jp/pricing)を再確認してください。
+Standard Stripe pricing in Japan has no setup or monthly fee, but a 3.6% processing fee applies to successful card payments. Payment Links are included without an additional fee beyond standard Payments pricing. Pricing can change; recheck [Stripe Japan pricing](https://stripe.com/jp/pricing) before production launch.
 
-## Telegram owner操作
+## Telegram owner operations
 
-- /commerce — Rockstar_ibotの販売メニュー
-- /tools — connector選択・状態確認
-- /product — 商品workflowの開始
-- /campaign — campaign workflowの開始
-- /approve &lt;id&gt; — 承認待ちworkflowの承認
-- /pause — 新しい実行の停止
+- `/commerce` — Rockstar_ibot sales menu
+- `/tools` — connector selection and status
+- `/product` — begin a product workflow
+- `/campaign` — begin a campaign workflow
+- `/approve <id>` — approve a waiting workflow
+- `/pause` — stop new executions
 
-これらは最終的に`@Rockstar_ibot`へ置くowner-only操作です。owner Botの移行完了までは顧客へ公開せず、`/approve`と`/pause`は連携済み所有者のTelegram個人chatで、実際のuser IDとchat IDが一致するときだけ処理します。group、未連携actor、actor差し替えは副作用前に拒否します。
+These are ultimately owner-only operations for `@Rockstar_ibot`. Until owner-bot migration is complete, they must not be exposed to customers. `/approve` and `/pause` run only in the linked owner's private Telegram chat when the actual user ID and chat ID both match. Groups, unlinked actors, and actor substitution are rejected before side effects.
 
-connectorを選択しただけでは接続済み・実行可能にはなりません。credential reference、adapter、必要capability、provider確認が揃うまでworkflowはblockedまたはapproval待ちのままです。
+Selecting a connector does not make it connected or executable. Work remains blocked or awaiting approval until a credential reference, adapter, required capability, and provider verification are all present.
 
-## アーキテクチャ
+## Architecture
 
 ~~~text
 Telegram / Hub / iOS
         │
         ▼
-Rockstar_ibot API・承認境界
+Rockstar_ibot API and approval boundary
         │
         ├── Core workflows
         │
@@ -362,132 +362,132 @@ Rockstar_ibot API・承認境界
               └── Decision / Outcome
         │
         ▼
-Durable queue・effect fence・append-only ledger
+Durable queue, effect fence, and append-only ledger
         │
         ▼
-交換可能なprovider adapter
+Replaceable provider adapters
         │
         ▼
-公式readback・receipt・reconciliation
+Authoritative readback, receipts, and reconciliation
 ~~~
 
-外部providerを正本にしません。Stripe、Telegram Stars、LMS、Community、CRM等は、commandを実行して観測を返す交換可能なadapterとして扱います。
+External providers are not the source of record. Stripe, Telegram Stars, LMS, community, CRM, and similar systems are replaceable adapters that execute commands and return observations.
 
-## 評価用OSS submodule
+## Open-source evaluation submodules
 
-vendor/commerce-upstreams/には次のsourceを固定commitで配置しています。
+`vendor/commerce-upstreams/` pins the following sources to fixed commits:
 
-| OSS | 評価対象 |
+| Project | Evaluation area |
 |---|---|
-| Formance Ledger | money ledger |
-| Temporal | 長時間workflow |
-| OpenFGA | authorization |
+| Formance Ledger | Money ledger |
+| Temporal | Long-running workflows |
+| OpenFGA | Authorization |
 | grammY | Telegram adapter |
-| Payload | content・evidence revision |
-| GrowthBook | experiment |
-| Casdoor | operator IAM |
-| Chatwoot | support adapter |
-| Medusa | commerce adapter |
+| Payload | Content and evidence revisions |
+| GrowthBook | Experiments |
+| Casdoor | Operator IAM |
+| Chatwoot | Support adapter |
+| Medusa | Commerce adapter |
 
-これらは評価用であり、本番採用済みという意味ではありません。license、security advisory、telemetry、tenant isolation、backup、export、削除、差し替えを確認してから独立serviceまたはadapter behind portとして採用します。固定commit一覧は[commerce-upstreams.json](config/commerce-upstreams.json)にあります。
+These projects are for evaluation and are not necessarily selected for production. License, security advisories, telemetry, tenant isolation, backup, export, deletion, and replaceability must be reviewed before adoption as an independent service or an adapter behind a port. Fixed commits are listed in [commerce-upstreams.json](config/commerce-upstreams.json).
 
-## テスト
+## Tests
 
-### Commerceのみ
+### Commerce only
 
 ~~~bash
 cd apps/rockstar_ibot
 npm run test:commerce
 ~~~
 
-### Rockstar_ibot全体
+### All Rockstar_ibot tests
 
 ~~~bash
 cd apps/rockstar_ibot
 npm test
 ~~~
 
-既知事項: 現在の基準commitには、旧OpenClaw／Anicca pathを検出するtest:legacy-pathsの既存失敗があります。Commerce変更とは独立しており、配布前に別途解消が必要です。
+Known issue: the baseline commit currently has an existing `test:legacy-paths` failure that detects old OpenClaw/Anicca paths. It is independent of Commerce changes and must be resolved before distribution.
 
-## 現在の制約
+## Current limitations
 
-| 項目 | 状態 |
+| Item | State |
 |---|---|
-| Commerce正本schema・store・test | 実装済み |
-| Telegram承認actor検証 | 実装済み |
-| provider Webhookのdurable inbox | 実装済み |
-| Core PanelのMetaMask送金先登録 | 実装済み。Base Mainnet（chain ID 8453）固定、5分の一回限り署名challenge、session・Origin・CSRF・tenant境界あり。自動送金は別機能 |
-| Stripe／Telegramの本番credential | 導入者設定待ち。秘密値なしではfail closed |
-| Stripe購入→Telegram接続 | 実装済み。Supabase migration・Payment Link redirect・Webhook設定後に有効 |
-| その他Commerce provider routes・adapter | 未接続。catalog、選択、workflow境界まで実装済み |
-| fresh Supabase用Core baseline schema | avocadomini入口用の最小bootstrapは実装・適用済み。Core全機能用baselineは未完成 |
-| HubからCoreへの本番outbox consumer | 未完成 |
-| shared multi-bot SaaS registry | 未完成 |
-| `@Rockstar_ibot` owner deployment | 未完成。`getMe`、Webhook、Kai allowlist、owner command、実送受信receiptが必要 |
-| 本番mobile API・APNs・StoreKit | 未完成 |
-| 全Service Cell executor | 一部のみ |
-| 3,000人規模の分離・負荷試験 | 未証明 |
-| 一般公開 | 未承認 |
+| Authoritative Commerce schema, stores, and tests | Implemented |
+| Telegram approver-actor validation | Implemented |
+| Durable inbox for provider webhooks | Implemented |
+| MetaMask receiving-address registration in Core Panel | Implemented for Base Mainnet, chain ID 8453, with a five-minute one-time signature challenge and session, Origin, CSRF, and tenant boundaries. Automatic transfer is a separate feature. |
+| Production Stripe and Telegram credentials | Waiting for installer configuration; fails closed without secrets. |
+| Stripe purchase → Telegram connection | Implemented; enabled after the Supabase migration, Payment Link redirect, and webhook setup. |
+| Other Commerce provider routes and adapters | Not connected; catalog, selection, and workflow boundaries are implemented. |
+| Fresh-Supabase Core baseline schema | Minimum avocadomini-entry bootstrap implemented and applied; full-Core baseline incomplete. |
+| Production outbox consumer from Hub to Core | Incomplete |
+| Shared multi-bot SaaS registry | Incomplete |
+| `@Rockstar_ibot` owner deployment | Incomplete; needs `getMe`, webhook, Kai allowlist, owner commands, and a real send/receive receipt. |
+| Production mobile API, APNs, and StoreKit | Incomplete |
+| All Service Cell executors | Partially implemented |
+| Isolation and load testing at 3,000-user scale | Unproven |
+| General public release | Not approved |
 
-設定値が存在することと、本番で安全に動作することは別です。外部資格情報と公式readbackがない機能はfail closedのまま維持します。
+The presence of configuration is not proof of safe production operation. Features without external credentials and authoritative readback remain fail-closed.
 
-## リポジトリ構成
+## Repository layout
 
-| Path | 役割 |
+| Path | Role |
 |---|---|
-| apps/rockstar_ibot/ | API、Telegram、scheduler、worker、Commerce |
-| apps/rockstar_ibot-hub/ | Rockstar_ibot One Web Hub |
-| apps/rockstar_ibot-ios/ | native SwiftUI iOS client |
-| apps/doraemon-marketing-site/ | 公開販売サイト、開始導線、法定・privacyページ |
-| apps/dora-launch-blueprint-site/ | 立ち上げ設計書の共有サイトとPDF |
-| apps/mcp-bot-hub-patent-site/ | MCP Bot Hub特許構想の共有サイトとPDF |
-| apps/rockstar_ibot/migrations/ | Core・Commerce schema変更 |
-| runtime/ | durable job、effect fence、economic runtime |
-| skills/ | 再利用可能なagent能力 |
-| services/ | compute、settlement、共有service |
-| integrations/ai-tools/ | 外部AI package manifestとcatalog |
-| vendor/commerce-upstreams/ | 固定commitの評価用OSS |
-| config/ | machine-readable policy・catalog |
-| docs/ | 設計、runbook、監査、証拠 |
-| specs/ | 実装計画と設計履歴 |
+| `apps/rockstar_ibot/` | API, Telegram, scheduler, worker, and Commerce |
+| `apps/rockstar_ibot-hub/` | Rockstar_ibot One Web Hub |
+| `apps/rockstar_ibot-ios/` | Native SwiftUI iOS client |
+| `apps/doraemon-marketing-site/` | Public sales site, entry flow, and legal/privacy pages |
+| `apps/dora-launch-blueprint-site/` | Site and PDF for sharing the launch blueprint |
+| `apps/mcp-bot-hub-patent-site/` | Site and PDF for sharing the MCP Bot Hub patent concept |
+| `apps/rockstar_ibot/migrations/` | Core and Commerce schema changes |
+| `runtime/` | Durable jobs, effect fences, and economic runtime |
+| `skills/` | Reusable agent capabilities |
+| `services/` | Compute, settlement, and shared services |
+| `integrations/ai-tools/` | External AI package manifests and catalog |
+| `vendor/commerce-upstreams/` | Evaluation OSS pinned to fixed commits |
+| `config/` | Machine-readable policies and catalogs |
+| `docs/` | Designs, runbooks, audits, and evidence |
+| `specs/` | Implementation plans and design history |
 
-## データ・安全契約
+## Data and safety contract
 
-- 既存Telegram projectionはtenant単位、新しいcanonical evidence storeはtenant・merchant単位で分離する
-- 販売者をまたぐ人物tracking IDを作らない
-- 合法かつ契約済みの業務dataだけを扱う
-- raw PII、credential、会話本文を意思決定・成果台帳へ保存しない
-- 同意目的、通知版、撤回、期限を別々に記録する
-- 未観測、pending、falseを混同しない
-- 成果物と外部readbackに結びつくreceiptなしに完了報告しない
-- 取消不能な外部操作と金融操作は現在の明示承認なしに実行しない
-- 売上、検索順位、健康、投資成果を保証しない
-- 個人追跡、標的選定、兵器用途には使用しない
+- Existing Telegram projections are isolated by tenant; the canonical evidence store is isolated by tenant and merchant.
+- Do not create an identity for tracking a person across merchants.
+- Handle only lawful, contracted business data.
+- Do not store raw personally identifiable information, credentials, or conversation bodies in decision and outcome ledgers.
+- Record consent purpose, notice version, withdrawal, and expiration separately.
+- Keep unobserved, pending, and false distinct.
+- Do not report completion without a receipt tied to the artifact and external readback.
+- Do not perform irreversible external or financial actions without current explicit approval.
+- Do not guarantee revenue, search rank, health, or investment outcomes.
+- Do not use the system for personal tracking, targeting, or weapons.
 
-## 主要ドキュメント
+## Key documents
 
-- [project.md](project.md) — 製品設計とroadmapの正本
-- [Rockstar_ibot統合方針](docs/revenue-assurance-integration.ja.md)
-- [Telegram Bot接続runbook](docs/telegram-bot-setup.ja.md)
-- [provider設定と未完成境界](docs/owner-tools-setup.ja.md)
-- [公開情報とsecretの分離](docs/owner-account-intake.ja.md)
-- [外部サービス運用変更履歴](docs/operations-change-log.ja.md)
-- [プロジェクト索引](docs/PROJECT_MEMORY_INDEX.ja.md)
-- [サイト外部接続・再接続台帳（avocadomini / PRIVATE/PIXEL）](docs/doraemon-site-reconnection.ja.md)
-- [2タスク全成果インベントリ](docs/DORA_OS_全成果インベントリ_2026-09-02.md)
-- [チャット削除・復元監査](docs/maintenance/chat-deletion-readiness-2026-09-04.ja.md)
-- [外部AI package仕様](integrations/ai-tools/README.md)
-- [SOUL.md](SOUL.md)・[THESIS.md](THESIS.md)
+- [project.md](project.md) — source of record for product design and roadmap
+- [Rockstar_ibot integration policy](docs/revenue-assurance-integration.ja.md)
+- [Telegram bot setup runbook](docs/telegram-bot-setup.ja.md)
+- [Provider configuration and incomplete boundaries](docs/owner-tools-setup.ja.md)
+- [Separating public information from secrets](docs/owner-account-intake.ja.md)
+- [External-service operations change log](docs/operations-change-log.ja.md)
+- [Project index](docs/PROJECT_MEMORY_INDEX.ja.md)
+- [External site connection and reconnection registry for avocadomini / PRIVATE/PIXEL](docs/doraemon-site-reconnection.ja.md)
+- [Complete two-task deliverable inventory](docs/DORA_OS_%E5%85%A8%E6%88%90%E6%9E%9C%E3%82%A4%E3%83%B3%E3%83%99%E3%83%B3%E3%83%88%E3%83%AA_2026-09-02.md)
+- [Chat deletion and recovery audit](docs/maintenance/chat-deletion-readiness-2026-09-04.ja.md)
+- [External AI package specification](integrations/ai-tools/README.md)
+- [SOUL.md](SOUL.md) and [THESIS.md](THESIS.md)
 
-## コントリビューション
+## Contributing
 
-1. 変更対象に近いAGENTS.mdと設計文書を先に読む
-2. secret、実顧客data、credential付きURLをcommitしない
-3. 外部作用は明示承認、idempotency、receipt、reconciliationを設計する
-4. 実装に対応するfocused testを追加する
-5. git diff --checkと該当testを通す
-6. 実装済みと未接続をREADME・docsで区別する
+1. Read the nearest `AGENTS.md` and relevant design documents first.
+2. Do not commit secrets, real customer data, or credential-bearing URLs.
+3. Design external effects around explicit approval, idempotency, receipts, and reconciliation.
+4. Add focused tests for the implementation.
+5. Run `git diff --check` and the relevant tests.
+6. Distinguish implemented behavior from unconnected behavior in the README and documentation.
 
-## ライセンス
+## License
 
-MIT License。詳細は[LICENSE](LICENSE)を参照してください。
+MIT License. See [LICENSE](LICENSE) for details.

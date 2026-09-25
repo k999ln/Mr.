@@ -20,16 +20,16 @@ export function formatUtcHour(value = new Date()) {
 export function renderSyncBlock({ syncedAt, branch, trackedFiles, runReceipt }) {
   return [
     START_MARKER,
-    "## 毎時リポジトリ同期",
+    "## Hourly repository sync",
     "",
-    "| 項目 | 状態 |",
+    "| Item | Status |",
     "|---|---|",
-    `| 最終自動同期 | ${syncedAt} |`,
-    `| 対象ブランチ | \`${branch}\` |`,
-    `| 追跡ファイル | ${trackedFiles.toLocaleString("en-US")}件 |`,
-    `| 実行receipt | ${runReceipt} |`,
+    `| Last automatic sync | ${syncedAt} |`,
+    `| Target branch | \`${branch}\` |`,
+    `| Tracked files | ${trackedFiles.toLocaleString("en-US")} |`,
+    `| Run receipt | ${runReceipt} |`,
     "",
-    "> この範囲は毎時のGitHub Actionsが更新します。製品説明や運用状態は、根拠となる変更と同じcommitで本文を更新します。",
+    "> GitHub Actions updates this block every hour. Product descriptions and operating status are updated in the body alongside the change that provides the supporting evidence.",
     END_MARKER,
   ].join("\n");
 }
@@ -82,7 +82,7 @@ export async function updateReadme({ now = process.env.README_SYNC_AT || new Dat
     && process.env.GITHUB_REPOSITORY
     && process.env.GITHUB_RUN_ID
     ? `[run ${process.env.GITHUB_RUN_ID}](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
-    : "ローカル実行";
+    : "Local run";
   const original = await readFile(readmePath, "utf8");
   const block = renderSyncBlock({ syncedAt, branch, trackedFiles, runReceipt });
   const updated = upsertSyncBlock(original, block);
